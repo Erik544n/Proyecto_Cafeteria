@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Gestion de Usuarios — EspressoPro{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1>Gestion de Usuarios y Roles</h1>
+            <p class="page-sub">Configure el acceso y los permisos para su equipo de trabajo.</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-secondary" onclick="abrirModal('modal-roles')">
+                &#9881; Asignar Roles
+            </button>
+            <button class="btn-primary-sm" onclick="abrirModal('modal-crear')">
+                &#43; Crear Usuario
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- TABLA DE USUARIOS -->
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Ultimo Acceso</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in usuarios %}
+            <tr>
+                <td>
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            {{ u.nombre[0] }}{{ u.apellido[0] }}
+                        </div>
+                        <div>
+                            <p class="user-nombre">{{ u.nombre }} {{ u.apellido }}</p>
+                            <p class="user-email">{{ u.email }}</p>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge badge-{{ u.rol_id }}">
+                        {% if u.rol_id == 1 %}ADMIN
+                        {% elif u.rol_id == 2 %}MESERO
+                        {% elif u.rol_id == 3 %}COCINA
+                        {% elif u.rol_id == 4 %}CAJERO
+                        {% else %}SIN ROL
+                        {% endif %}
+                    </span>
+                </td>
+                <td>
+                    {% if u.activo %}
+                        <span class="estado-activo">&#9679; Activo</span>
+                    {% else %}
+                        <span class="estado-inactivo">&#9679; Inactivo</span>
+                    {% endif %}
+                </td>
+                <td class="ultimo-acceso">
+                    {{ u.ultimo_login if u.ultimo_login else "Sin acceso aun" }}
+                </td>
+                <td>
+                    <div class="actions">
+                        <a href="/usuarios/{{ u.usuario_id }}/editar"
+                           class="btn-accion" title="Editar">&#9998;</a>
+                        {% if u.activo %}
+                        <a href="/usuarios/{{ u.usuario_id }}/desactivar"
+                           class="btn-accion rojo" title="Desactivar"
+                           onclick="return confirm('Desactivar usuario?')">&#10006;</a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="tabla-vacia">No hay usuarios registrados.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+<!-- MODAL CREAR USUARIO -->
+<div class="modal-overlay" id="modal-crear">
+    <div class="modal">
+        <h2>Crear Usuario</h2>
+        <form method="POST" action="/usuarios/crear">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" name="nombre" required placeholder="Juan">
+                </div>
+                <div class="form-group">
+                    <label>Apellido</label>
+                    <input type="text" name="apellido" required placeholder="Perez">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Correo electronico</label>
+                <input type="email" name="email" required placeholder="juan@cafeteria.com">
+            </div>
+            <div class="form-group">
+                <label>Contrasena</label>
+                <input type="password" name="password" required placeholder="••••••••">
+            </div>
+            <div class="form-group">
+                <label>Telefono (opcional)</label>
+                <input type="text" name="telefono" placeholder="442 000 0000">
+            </div>
+            <div class="form-group">
+                <label>Rol</label>
+                <select name="rol_id" required>
+                    {% for rol in roles %}
+                    <option value="{{ rol.rol_id }}">{{ rol.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary"
+                        onclick="cerrarModal('modal-crear')">Cancelar</button>
+                <button type="submit" class="btn-primary-sm">Crear Usuario</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- MODAL ASIGNAR ROLES -->
+<div class="modal-overlay" id="modal-roles">
+    <div class="modal">
+        <h2>Roles del Sistema</h2>
+        <div class="roles-lista">
+            {% for rol in roles %}
+            <div class="rol-item">
+                <span class="badge badge-{{ rol.rol_id }}">{{ rol.nombre }}</span>
+                <p class="rol-desc">{{ rol.descripcion }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary"
+                    onclick="cerrarModal('modal-roles')">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

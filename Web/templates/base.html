@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EspressoPro Admin{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+{% if session.token %}
+<div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>EspressoPro</h2>
+            <p>Admin Terminal</p>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                &#9646; Panel de Control
+            </a>
+            <a href="{{ url_for('usuarios') }}" class="nav-item {% if request.endpoint == 'usuarios' %}active{% endif %}">
+                &#9646; Gestion de Usuarios
+            </a>
+            <a href="{{ url_for('estadisticas') }}" class="nav-item {% if request.endpoint == 'estadisticas' %}active{% endif %}">
+                &#9646; Estadisticas
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <span class="sidebar-user">{{ session.nombre }}</span>
+            <a href="{{ url_for('logout') }}" class="btn-logout">&#8594; Cerrar Sesion</a>
+        </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+</div>
+{% else %}
+    {% block auth %}{% endblock %}
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
