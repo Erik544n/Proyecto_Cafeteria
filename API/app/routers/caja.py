@@ -6,8 +6,8 @@ from datetime import datetime, date
 from decimal import Decimal
 
 from ..database import get_db
-from ..models import Pedido, Venta, Mesa, Notificacion, Usuario
-from ..schemas import VentaCreate, VentaResponse, PedidoResponse
+from ..models import Pedido, Venta, Mesa, Notificacion, Usuario, Gasto
+from ..schemas import VentaCreate, VentaResponse, PedidoResponse, GastoCreate, GastoResponse
 from .auth import get_current_user
 
 router = APIRouter(prefix="/caja", tags=["Caja"])
@@ -227,3 +227,89 @@ def obtener_ticket(
     if not venta:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     return venta
+
+
+# ─────────────────────────────────────────
+# GASTOS / COMPRAS
+# ─────────────────────────────────────────
+@router.get("/gastos", response_model=List[GastoResponse])
+def listar_gastos(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    """Lista todos los gastos y compras registrados."""
+    return db.query(Gasto).order_by(Gasto.creado_en.desc()).all()
+
+
+@router.post("/gastos", response_model=GastoResponse, status_code=201)
+def registrar_gasto(
+    datos: GastoCreate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    """
+    Registra un gasto o compra del local.
+    Ejemplo: compra de insumos, servicios, etc.
+    """
+    gasto = Gasto(
+        categoria_gasto_id = datos.categoria_gasto_id,
+        concepto           = datos.concepto,
+        monto              = datos.monto,
+        fecha_gasto        = date.today(),
+        usuario_id         = usuario.usuario_id
+    )
+    db.add(gasto)
+    db.commit()
+    db.refresh(gasto)
+    return gasto
+
+
+@router.get("/gastos/{gasto_id}", response_model=GastoResponse)
+def obtener_gasto(
+    gasto_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    """Obtiene el detalle de un gasto específico."""
+    gasto = db.query(Gasto).filter(Gasto.gasto_id == gasto_id).first()
+    if not gasto:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    return gasto
+
+
+@router.delete("/gastos/{gasto_id}")
+def eliminar_gasto(
+    gasto_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    """Elimina un gasto registrado por error."""
+    gasto = db.query(Gasto).filter(Gasto.gasto_id == gasto_id).first()
+    if not gasto:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    db.delete(gasto)
+    db.commit()
+    return {"mensaje": "Gasto eliminado", "gasto_id": gasto_id}
+
+
+# ─────────────────────────────────────────
+# ANULAR VENTA
+# ─────────────────────────────────────────
+@router.patch("/ventas/{venta_id}/anular")
+def anular_venta(
+    venta_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    """
+    Anula una venta ya procesada.
+    Solo para correcciones administrativas.
+    """
+    venta = db.query(Venta).filter(Venta.venta_id == venta_id).first()
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    if venta.anulada:
+        raise HTTPException(status_code=400, detail="La venta ya está anulada")
+    venta.anulada = True
+    db.commit()
+    return {"mensaje": "Venta anulada", "venta_id": venta_id}

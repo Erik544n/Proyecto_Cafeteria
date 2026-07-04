@@ -67,13 +67,16 @@
                 </td>
                 <td>
                     <div class="actions">
-                        <a href="/usuarios/{{ u.usuario_id }}/editar"
-                           class="btn-accion" title="Editar">&#9998;</a>
+                        <a href="#" class="btn-accion" title="Editar"
+                           onclick="abrirModalEditar('{{ u.usuario_id }}', '{{ u.nombre }}', '{{ u.apellido }}', '{{ u.email }}', '{{ u.telefono or '' }}', '{{ u.rol_id }}', {{ 'true' if u.activo else 'false' }}); return false;">&#9998;</a>
                         {% if u.activo %}
                         <a href="/usuarios/{{ u.usuario_id }}/desactivar"
-                           class="btn-accion rojo" title="Desactivar"
-                           onclick="return confirm('Desactivar usuario?')">&#10006;</a>
+                           class="btn-accion naranja" title="Desactivar"
+                           onclick="return confirm('¿Desactivar usuario?')">&#10006;</a>
                         {% endif %}
+                        <a href="#"
+                           class="btn-accion rojo" title="Eliminar permanentemente"
+                           onclick="confirmarEliminarUsuario('{{ u.usuario_id }}', '{{ u.nombre }} {{ u.apellido }}'); return false;">&#128465;</a>
                     </div>
                 </td>
             </tr>
@@ -107,8 +110,8 @@
                 <input type="email" name="email" required placeholder="juan@cafeteria.com">
             </div>
             <div class="form-group">
-                <label>Contrasena</label>
-                <input type="password" name="password" required placeholder="••••••••">
+                <label>Contrasena (Minimo 9 caracteres)</label>
+                <input type="password" name="password" required placeholder="••••••••" minlength="9">
             </div>
             <div class="form-group">
                 <label>Telefono (opcional)</label>
@@ -132,6 +135,69 @@
 </div>
 
 
+<!-- MODAL EDITAR USUARIO -->
+<div class="modal-overlay" id="modal-editar">
+    <div class="modal">
+        <h2>Editar Usuario</h2>
+        <form method="POST" id="form-editar">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" name="nombre" id="edit-nombre" required>
+                </div>
+                <div class="form-group">
+                    <label>Apellido</label>
+                    <input type="text" name="apellido" id="edit-apellido" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Correo electronico (No editable)</label>
+                <input type="email" id="edit-email" readonly style="background: #f5f0eb; cursor: not-allowed;">
+            </div>
+            <div class="form-group">
+                <label>Telefono (opcional)</label>
+                <input type="text" name="telefono" id="edit-telefono">
+            </div>
+            <div class="form-group">
+                <label>Rol</label>
+                <select name="rol_id" id="edit-rol" required>
+                    {% for rol in roles %}
+                    <option value="{{ rol.rol_id }}">{{ rol.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Estado</label>
+                <select name="activo" id="edit-activo" required>
+                    <option value="true">Activo</option>
+                    <option value="false">Inactivo</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary"
+                        onclick="cerrarModal('modal-editar')">Cancelar</button>
+                <button type="submit" class="btn-primary-sm">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- MODAL CONFIRMAR ELIMINACION (ESTILO SHADCN ALERT DIALOG) -->
+<div class="modal-overlay" id="modal-confirmar-eliminar">
+    <div class="modal-shadcn" style="max-width: 420px; border-top: 4px solid #e11d48;">
+        <div class="modal-shadcn-header">
+            <h2 class="modal-shadcn-title">¿Estas seguro de eliminar?</h2>
+            <p class="modal-shadcn-description" id="eliminar-mensaje" style="margin-top: 8px; line-height: 1.4;">Esta accion no se puede deshacer. Se eliminara permanentemente la cuenta del usuario de la base de datos.</p>
+        </div>
+        <div class="modal-shadcn-footer" style="margin-top: 20px;">
+            <button type="button" class="btn-shadcn-outline" onclick="cerrarModal('modal-confirmar-eliminar')">Cancelar</button>
+            <a href="#" id="btn-eliminar-confirmado" class="btn-shadcn-primary" style="background: #e11d48; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; height: 38px; padding: 0 16px; border-radius: 6px; color: #fff; font-weight: 500; border: none; font-size: 14px; cursor: pointer; transition: background 0.2s;">Si, eliminar</a>
+        </div>
+    </div>
+</div>
+
+
 <!-- MODAL ASIGNAR ROLES -->
 <div class="modal-overlay" id="modal-roles">
     <div class="modal">
@@ -150,5 +216,24 @@
         </div>
     </div>
 </div>
+
+<script>
+function abrirModalEditar(id, nombre, apellido, email, telefono, rolId, activo) {
+    document.getElementById('form-editar').action = '/usuarios/' + id + '/editar';
+    document.getElementById('edit-nombre').value = nombre;
+    document.getElementById('edit-apellido').value = apellido;
+    document.getElementById('edit-email').value = email;
+    document.getElementById('edit-telefono').value = telefono;
+    document.getElementById('edit-rol').value = rolId;
+    document.getElementById('edit-activo').value = activo ? 'true' : 'false';
+    abrirModal('modal-editar');
+}
+
+function confirmarEliminarUsuario(id, nombreCompleto) {
+    document.getElementById('eliminar-mensaje').innerText = '¿Estas seguro de que deseas eliminar permanentemente a ' + nombreCompleto + '? Esta accion borrara por completo sus datos del sistema.';
+    document.getElementById('btn-eliminar-confirmado').href = '/usuarios/' + id + '/eliminar';
+    abrirModal('modal-confirmar-eliminar');
+}
+</script>
 
 {% endblock %}

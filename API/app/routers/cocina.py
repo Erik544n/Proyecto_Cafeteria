@@ -4,8 +4,8 @@ from typing import List
 from datetime import datetime
 
 from ..database import get_db
-from ..models import Pedido, Insumo, Receta, MovimientoInventario, Notificacion, Usuario
-from ..schemas import PedidoResponse, PedidoEstadoUpdate, InsumoResponse
+from ..models import Pedido, Insumo, Receta, MovimientoInventario, Notificacion, Usuario, ProductoMenu
+from ..schemas import PedidoResponse, PedidoEstadoUpdate, InsumoResponse, InsumoCreate, InsumoUpdate, ProductoCreate, ProductoResponse
 from .auth import get_current_user
 
 router = APIRouter(prefix="/cocina", tags=["Cocina"])
@@ -217,3 +217,127 @@ def _notificar_mesero(pedido: Pedido, db: Session):
                      + (f" — Mesa {pedido.mesa_id}" if pedido.mesa_id else " — Para llevar")
     )
     db.add(notif)
+
+
+# ─────────────────────────────────────────
+# GESTIÓN DE MENÚ (PRODUCTOS)
+# ─────────────────────────────────────────
+@router.post("/productos", response_model=ProductoResponse, status_code=201)
+def crear_producto(
+    datos: ProductoCreate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    nuevo = ProductoMenu(
+        categoria_id = datos.categoria_id,
+        nombre       = datos.nombre,
+        descripcion  = datos.descripcion,
+        precio       = datos.precio,
+        imagen_url   = datos.imagen_url,
+        activo       = True,
+        disponible   = True
+    )
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    return nuevo
+
+@router.get("/productos/{producto_id}", response_model=ProductoResponse)
+def ver_detalle_producto(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    prod = db.query(ProductoMenu).filter(ProductoMenu.producto_id == producto_id).first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return prod
+
+@router.put("/productos/{producto_id}", response_model=ProductoResponse)
+def editar_producto(
+    producto_id: int,
+    datos: ProductoCreate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    prod = db.query(ProductoMenu).filter(ProductoMenu.producto_id == producto_id).first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    prod.categoria_id = datos.categoria_id
+    prod.nombre = datos.nombre
+    prod.descripcion = datos.descripcion
+    prod.precio = datos.precio
+    if datos.imagen_url is not None:
+        prod.imagen_url = datos.imagen_url
+    db.commit()
+    db.refresh(prod)
+    return prod
+
+@router.delete("/productos/{producto_id}")
+def eliminar_producto(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    prod = db.query(ProductoMenu).filter(ProductoMenu.producto_id == producto_id).first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    prod.activo = False
+    db.commit()
+    return {"mensaje": "Producto desactivado del menu"}
+
+
+# ─────────────────────────────────────────
+# GESTIÓN DE SUMINISTROS (INSUMOS)
+# ─────────────────────────────────────────
+@router.post("/insumos", response_model=InsumoResponse, status_code=201)
+def crear_insumo(
+    datos: InsumoCreate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    nuevo = Insumo(
+        nombre = datos.nombre,
+        unidad_id = datos.unidad_id,
+        stock_actual = datos.stock_actual,
+        stock_minimo = datos.stock_minimo,
+        costo_unitario = datos.costo_unitario,
+        activo = True
+    )
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+    return nuevo
+
+@router.put("/insumos/{insumo_id}", response_model=InsumoResponse)
+def editar_insumo(
+    insumo_id: int,
+    datos: InsumoUpdate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    ins = db.query(Insumo).filter(Insumo.insumo_id == insumo_id).first()
+    if not ins:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    if datos.stock_actual is not None:
+        ins.stock_actual = datos.stock_actual
+    if datos.stock_minimo is not None:
+        ins.stock_minimo = datos.stock_minimo
+    if datos.costo_unitario is not None:
+        ins.costo_unitario = datos.costo_unitario
+    db.commit()
+    db.refresh(ins)
+    return ins
+
+@router.delete("/insumos/{insumo_id}")
+def eliminar_insumo(
+    insumo_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    ins = db.query(Insumo).filter(Insumo.insumo_id == insumo_id).first()
+    if not ins:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    ins.activo = False
+    db.commit()
+    return {"mensaje": "Insumo desactivado"}

@@ -1,6 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 
 
@@ -26,7 +26,7 @@ class UsuarioCreate(BaseModel):
     nombre: str
     apellido: str
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=9)
     telefono: Optional[str] = None
     rol_id: int
 
@@ -206,3 +206,30 @@ class ProductoVendido(BaseModel):
     nombre: str
     total_vendido: int
     ingresos: Decimal
+
+
+# ─────────────────────────────────────────
+# NUEVOS SCHEMAS COMPLEMENTARIOS
+# ─────────────────────────────────────────
+class InsumoCreate(BaseModel):
+    nombre: str
+    unidad_id: int
+    stock_actual: Decimal
+    stock_minimo: Decimal
+    costo_unitario: Decimal
+
+class GastoCreate(BaseModel):
+    categoria_gasto_id: int
+    concepto: str
+    monto: Decimal
+
+class GastoResponse(BaseModel):
+    gasto_id: int
+    categoria_gasto_id: int
+    concepto: str
+    monto: Decimal
+    fecha_gasto: date
+    creado_en: datetime
+
+    class Config:
+        from_attributes = True

@@ -7,8 +7,8 @@
     <div class="page-header-row">
         <h1>Resumen del Dia</h1>
         <div class="header-actions">
-            <span class="fecha-badge">&#128197; Hoy</span>
-            <a href="{{ url_for('estadisticas') }}" class="btn-exportar">&#8595; Exportar</a>
+            <span class="fecha-badge">Hoy</span>
+            <a href="{{ url_for('estadisticas') }}" class="btn-exportar">Exportar</a>
         </div>
     </div>
 </div>
@@ -17,30 +17,27 @@
 <div class="resumen-grid">
     <div class="resumen-card">
         <div class="resumen-card-top">
-            <span class="resumen-icon">&#128179;</span>
+            <p class="resumen-label">Ventas Totales</p>
             <span class="resumen-badge positivo">+12%</span>
         </div>
-        <p class="resumen-label">Ventas Totales</p>
         <h2 class="resumen-valor">${{ "%.2f"|format(resumen.get("ventas_totales", 0)) }}</h2>
     </div>
     <div class="resumen-card">
         <div class="resumen-card-top">
-            <span class="resumen-icon">&#128203;</span>
+            <p class="resumen-label">Gastos</p>
             <span class="resumen-badge neutro">Estable</span>
         </div>
-        <p class="resumen-label">Gastos</p>
         <h2 class="resumen-valor">${{ "%.2f"|format(resumen.get("gastos_totales", 0)) }}</h2>
     </div>
     <div class="resumen-card">
         <div class="resumen-card-top">
-            <span class="resumen-icon">&#128200;</span>
+            <p class="resumen-label">Ganancias Netas</p>
             <span class="resumen-badge positivo">+8.4%</span>
         </div>
-        <p class="resumen-label">Ganancias Netas</p>
         <h2 class="resumen-valor">${{ "%.2f"|format(resumen.get("ganancias_netas", 0)) }}</h2>
     </div>
     <div class="resumen-card resumen-card-dark">
-        <p class="resumen-badge-top">M3s Vendido</p>
+        <p class="resumen-badge-top">Mas Vendido</p>
         <p class="resumen-label-light">Producto Estrella</p>
         <h2 class="resumen-producto">Cappuccino Artesanal</h2>
     </div>
@@ -53,10 +50,10 @@
     <div class="grafica-card">
         <div class="grafica-header">
             <h3>Ventas por Hora</h3>
-            <span class="punto-hoy">&#9679; Hoy</span>
+            <span class="punto-hoy">Hoy</span>
         </div>
         <div class="grafica-barras">
-            {% set horas = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00'] %}
+            {% set horas   = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00'] %}
             {% set valores = [20, 35, 65, 80, 90, 72, 55, 40] %}
             {% for i in range(horas|length) %}
             <div class="barra-wrap">
@@ -75,7 +72,7 @@
         </div>
         <div class="actividad-lista">
             <div class="actividad-item">
-                <span class="actividad-icon verde">&#127968;</span>
+                <div class="actividad-icon verde"></div>
                 <div>
                     <p class="actividad-titulo">Pedidos activos</p>
                     <p class="actividad-sub">{{ resumen.get("pedidos_activos", 0) }} en curso ahora</p>
@@ -83,7 +80,7 @@
                 </div>
             </div>
             <div class="actividad-item">
-                <span class="actividad-icon azul">&#128203;</span>
+                <div class="actividad-icon azul"></div>
                 <div>
                     <p class="actividad-titulo">Total de pedidos hoy</p>
                     <p class="actividad-sub">{{ resumen.get("total_pedidos", 0) }} pedidos registrados</p>
@@ -91,7 +88,7 @@
                 </div>
             </div>
             <div class="actividad-item">
-                <span class="actividad-icon cafe">&#127968;</span>
+                <div class="actividad-icon cafe"></div>
                 <div>
                     <p class="actividad-titulo">Ganancias del dia</p>
                     <p class="actividad-sub">${{ "%.2f"|format(resumen.get("ganancias_netas", 0)) }} netas</p>
@@ -100,7 +97,7 @@
             </div>
             {% if resumen.get("gastos_totales", 0) > 0 %}
             <div class="actividad-item">
-                <span class="actividad-icon naranja">&#9888;</span>
+                <div class="actividad-icon naranja"></div>
                 <div>
                     <p class="actividad-titulo">Gastos registrados</p>
                     <p class="actividad-sub">${{ "%.2f"|format(resumen.get("gastos_totales", 0)) }} en gastos</p>

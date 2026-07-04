@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import auth, mesero, cocina, caja, admin
+from .routers import auth, mesero, cocina, caja, admin, reportes
 
 app = FastAPI(
     title="Cafeteria API",
@@ -9,9 +9,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# ─────────────────────────────────────────
-# CORS
-# ─────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,25 +17,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────
-# ROUTERS
-# ─────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(mesero.router)
 app.include_router(cocina.router)
 app.include_router(caja.router)
 app.include_router(admin.router)
+app.include_router(reportes.router)
 
-# ─────────────────────────────────────────
-# HEALTH CHECK
-# ─────────────────────────────────────────
 @app.get("/", tags=["Health"])
 def root():
-    return {
-        "mensaje": "Cafeteria API funcionando ✓",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+    return {"mensaje": "Cafeteria API funcionando", "version": "1.0.0", "docs": "/docs"}
 
 @app.get("/health", tags=["Health"])
 def health():

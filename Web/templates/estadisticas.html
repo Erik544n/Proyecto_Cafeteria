@@ -1,0 +1,587 @@
+{% extends "base.html" %}
+{% block title %}Estadisticas — EspressoPro{% endblock %}
+
+{% block content %}
+
+<!-- ═══════════════════════════════════════════
+     ENCABEZADO
+     ═══════════════════════════════════════════ -->
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1>Reporte Detallado de Ventas</h1>
+            <p class="page-sub">Analisis exhaustivo del rendimiento comercial diario.</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-exportar-main" id="btn-exportar-reporte" onclick="abrirModal('modal-preview-reporte')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Exportar Reporte
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TARJETAS RESUMEN
+     ═══════════════════════════════════════════ -->
+<div class="stats-cards-grid">
+
+    <!-- Tarjeta 1: Total de ventas -->
+    <div class="stats-card">
+        <div class="stats-card-icon-wrap">
+            <div class="stats-card-icon verde-bg">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a7a3a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+            </div>
+        </div>
+        <p class="stats-card-label">Total de Ventas</p>
+        <h2 class="stats-card-value">${{ "%.2f"|format(resumen.get("ventas_totales", 0)) }}</h2>
+        <div class="stats-card-trend positivo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                <polyline points="17 6 23 6 23 12"/>
+            </svg>
+            +12% vs ayer
+        </div>
+    </div>
+
+    <!-- Tarjeta 2: Ticket promedio -->
+    <div class="stats-card">
+        <div class="stats-card-icon-wrap">
+            <div class="stats-card-icon azul-bg">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a5e8b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+            </div>
+        </div>
+        <p class="stats-card-label">Ticket Promedio</p>
+        <h2 class="stats-card-value">
+            {% if resumen.get("total_pedidos", 0) > 0 %}
+                ${{ "%.2f"|format(resumen.get("ventas_totales", 0) / resumen.get("total_pedidos", 1)) }}
+            {% else %}
+                $0.00
+            {% endif %}
+        </h2>
+        <div class="stats-card-trend neutro">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Promedio por pedido
+        </div>
+    </div>
+
+    <!-- Tarjeta 3: Ventas por canal -->
+    <div class="stats-card">
+        <div class="stats-card-icon-wrap">
+            <div class="stats-card-icon cafe-bg">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5e1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+                </svg>
+            </div>
+        </div>
+        <p class="stats-card-label">Ventas por Canal</p>
+        <div class="stats-canal-bars">
+            <div class="canal-item">
+                <div class="canal-info">
+                    <span class="canal-dot salon"></span>
+                    <span class="canal-name">Salon</span>
+                    <span class="canal-pct">{{ pct_salon }}%</span>
+                </div>
+                <div class="canal-bar-bg">
+                    <div class="canal-bar-fill salon" style="width: {{ pct_salon }}%"></div>
+                </div>
+            </div>
+            <div class="canal-item">
+                <div class="canal-info">
+                    <span class="canal-dot takeaway"></span>
+                    <span class="canal-name">Take Away</span>
+                    <span class="canal-pct">{{ pct_takeaway }}%</span>
+                </div>
+                <div class="canal-bar-bg">
+                    <div class="canal-bar-fill takeaway" style="width: {{ pct_takeaway }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     GRAFICOS COMPARATIVOS (GASTOS, GANANCIAS Y PRODUCTOS)
+     ═══════════════════════════════════════════ -->
+<div class="charts-grid-section">
+    <div class="chart-card">
+        <h3 class="chart-title">Rendimiento Financiero (Gastos vs Ganancias)</h3>
+        <div class="chart-canvas-wrap">
+            <canvas id="chart-financiero"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h3 class="chart-title">Productos Mas Vendidos</h3>
+        <div class="chart-canvas-wrap">
+            <canvas id="chart-productos"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     FILTROS
+     ═══════════════════════════════════════════ -->
+<div class="filtros-container">
+    <div class="filtros-titulo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+        Filtros
+    </div>
+    <form class="filtros-form" method="GET" action="{{ url_for('estadisticas') }}">
+        <div class="filtro-group">
+            <label for="fecha_inicio">Fecha inicio</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ fecha_inicio }}">
+        </div>
+        <div class="filtro-group">
+            <label for="fecha_fin">Fecha fin</label>
+            <input type="date" id="fecha_fin" name="fecha_fin" value="{{ fecha_fin }}">
+        </div>
+        <div class="filtro-group">
+            <label for="categoria">Categoria</label>
+            <select id="categoria" name="categoria">
+                <option value="">Todas las categorias</option>
+                {% for cat in categorias %}
+                <option value="{{ cat.categoria_id }}" {% if categoria_sel == cat.categoria_id|string %}selected{% endif %}>{{ cat.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filtro-group">
+            <label for="metodo_pago">Metodo de pago</label>
+            <select id="metodo_pago" name="metodo_pago">
+                <option value="">Todos los metodos</option>
+                <option value="EFECTIVO" {% if metodo_pago_sel == 'EFECTIVO' %}selected{% endif %}>Efectivo</option>
+                <option value="TARJETA" {% if metodo_pago_sel == 'TARJETA' %}selected{% endif %}>Tarjeta</option>
+                <option value="TRANSFERENCIA" {% if metodo_pago_sel == 'TRANSFERENCIA' %}selected{% endif %}>Transferencia</option>
+            </select>
+        </div>
+        <div class="filtro-group filtro-btn-wrap">
+            <button type="submit" class="btn-filtrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Aplicar Filtros
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TABLA DE TRANSACCIONES
+     ═══════════════════════════════════════════ -->
+<div class="stats-table-section">
+    <div class="stats-table-header">
+        <h3>Transacciones</h3>
+        <span class="stats-table-count">
+            Mostrando {{ ventas|length }} de {{ total_ventas_count }} transacciones
+        </span>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Ticket</th>
+                    <th>Hora</th>
+                    <th>Mesa</th>
+                    <th>Productos</th>
+                    <th>Pago</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in ventas %}
+                <tr>
+                    <td>
+                        <span class="ticket-id">#{{ v.venta_id }}</span>
+                    </td>
+                    <td>
+                        <span class="ticket-hora">{{ v.hora }}</span>
+                    </td>
+                    <td>
+                        {% if v.mesa_num %}
+                            <span class="mesa-badge">Mesa {{ v.mesa_num }}</span>
+                        {% else %}
+                            <span class="mesa-badge takeaway-badge">Para llevar</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="productos-texto">{{ v.productos_texto }}</span>
+                    </td>
+                    <td>
+                        <span class="badge-metodo badge-{{ v.metodo_pago|lower }}">{{ v.metodo_pago }}</span>
+                    </td>
+                    <td class="text-right">
+                        <span class="total-valor">${{ "%.2f"|format(v.total) }}</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="tabla-vacia">
+                        <div class="vacia-icon">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d4c4b0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                            </svg>
+                        </div>
+                        No hay transacciones con los filtros seleccionados.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if total_paginas > 1 %}
+    <div class="paginacion">
+        <div class="paginacion-info">
+            Pagina {{ pagina_actual }} de {{ total_paginas }}
+        </div>
+        <div class="paginacion-btns">
+            {% if pagina_actual > 1 %}
+            <a href="{{ url_for('estadisticas', pagina=pagina_actual-1, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, categoria=categoria_sel, metodo_pago=metodo_pago_sel) }}" class="pag-btn">
+                &laquo; Anterior
+            </a>
+            {% endif %}
+
+            {% for p in range(1, total_paginas + 1) %}
+                {% if p == pagina_actual %}
+                    <span class="pag-btn pag-active">{{ p }}</span>
+                {% elif p <= 3 or p > total_paginas - 2 or (p >= pagina_actual - 1 and p <= pagina_actual + 1) %}
+                    <a href="{{ url_for('estadisticas', pagina=p, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, categoria=categoria_sel, metodo_pago=metodo_pago_sel) }}" class="pag-btn">{{ p }}</a>
+                {% elif p == 4 or p == total_paginas - 2 %}
+                    <span class="pag-ellipsis">&hellip;</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if pagina_actual < total_paginas %}
+            <a href="{{ url_for('estadisticas', pagina=pagina_actual+1, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, categoria=categoria_sel, metodo_pago=metodo_pago_sel) }}" class="pag-btn">
+                Siguiente &raquo;
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     MODAL VISTA PREVIA DEL REPORTE
+     ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-preview-reporte">
+    <div class="modal-shadcn">
+        <div class="modal-shadcn-header">
+            <h2 class="modal-shadcn-title">Reporte de Ventas</h2>
+            <p class="modal-shadcn-description">Vista previa del documento.</p>
+            <button class="modal-shadcn-close" onclick="cerrarModal('modal-preview-reporte')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="modal-shadcn-content">
+            <!-- Resumen de filtros y totales -->
+            <div class="preview-filters-summary">
+                <div class="summary-item">
+                    <span class="summary-label">Periodo</span>
+                    <span class="summary-value">{{ fecha_inicio }} al {{ fecha_fin }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Categoria</span>
+                    <span class="summary-value">
+                        {% set found_cat = namespace(nombre='Todas') %}
+                        {% for c in categorias %}
+                            {% if c.categoria_id|string == categoria_sel %}
+                                {% set found_cat.nombre = c.nombre %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ found_cat.nombre }}
+                    </span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Metodo de pago</span>
+                    <span class="summary-value">{{ metodo_pago_sel if metodo_pago_sel else 'Todos' }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total de ventas</span>
+                    <span class="summary-value">${{ "%.2f"|format(resumen.get("ventas_totales", 0)) }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Ticket promedio</span>
+                    <span class="summary-value">
+                        {% if total_ventas_count > 0 %}
+                            ${{ "%.2f"|format(resumen.get("ventas_totales", 0) / total_ventas_count) }}
+                        {% else %}
+                            $0.00
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Numero de transacciones</span>
+                    <span class="summary-value">{{ total_ventas_count }}</span>
+                </div>
+            </div>
+
+            <!-- Tabla resumida -->
+            <div class="preview-table-container">
+                <table class="preview-shadcn-table">
+                    <thead>
+                        <tr>
+                            <th>ID Ticket</th>
+                            <th>Hora</th>
+                            <th>Metodo de Pago</th>
+                            <th class="text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in ventas[:5] %}
+                        <tr>
+                            <td>#{{ v.venta_id }}</td>
+                            <td>{{ v.hora }}</td>
+                            <td>
+                                <span class="badge-metodo badge-{{ v.metodo_pago|lower }}">{{ v.metodo_pago }}</span>
+                            </td>
+                            <td class="text-right">${{ "%.2f"|format(v.total) }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if ventas|length > 5 %}
+                        <tr>
+                            <td colspan="4" class="text-center italic-text text-gray">... y {{ total_ventas_count - 5 }} mas</td>
+                        </tr>
+                        {% endif %}
+                        {% if not ventas %}
+                        <tr>
+                            <td colspan="4" class="text-center italic-text text-gray">Sin ventas registradas.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="modal-shadcn-footer">
+            <button class="btn-shadcn-outline" onclick="cerrarModal('modal-preview-reporte')">Cancelar</button>
+            <button class="btn-shadcn-primary" onclick="cerrarModal('modal-preview-reporte'); abrirModal('modal-opciones-exportacion')">Exportar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODAL OPCIONES DE EXPORTACION
+     ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-opciones-exportacion">
+    <div class="modal-shadcn">
+        <div class="modal-shadcn-header">
+            <h2 class="modal-shadcn-title">Configuracion de Exportacion</h2>
+            <p class="modal-shadcn-description">Elige el formato y las opciones de detalle para generar el archivo.</p>
+            <button class="modal-shadcn-close" onclick="cerrarModal('modal-opciones-exportacion')" id="btn-close-export" type="button">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        
+        <form id="export-form" onsubmit="handleExportSubmit(event)">
+            <div class="modal-shadcn-content">
+                
+                <!-- Opciones de formato (Radio) -->
+                <div class="export-format-group">
+                    <label class="export-radio-card">
+                        <input type="radio" name="formato" value="pdf" checked>
+                        <div class="export-radio-content">
+                            <div class="radio-circle"></div>
+                            <div class="export-radio-text">
+                                <span class="export-radio-title">PDF</span>
+                                <span class="export-radio-desc">Documento oficial.</span>
+                            </div>
+                            <div class="export-icon-small pdf">PDF</div>
+                        </div>
+                    </label>
+
+                    <label class="export-radio-card">
+                        <input type="radio" name="formato" value="excel">
+                        <div class="export-radio-content">
+                            <div class="radio-circle"></div>
+                            <div class="export-radio-text">
+                                <span class="export-radio-title">Excel</span>
+                                <span class="export-radio-desc">Hoja de calculo.</span>
+                            </div>
+                            <div class="export-icon-small xlsx">XLSX</div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Opciones de detalle (Checkboxes) -->
+                <div class="export-options-section">
+                    <h4 class="export-section-title">Opciones de detalle</h4>
+                    
+                    <label class="export-check-item">
+                        <input type="checkbox" name="incluirProductos" checked>
+                        <div class="check-box-custom">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <span>Incluir desglose de productos</span>
+                    </label>
+
+                    <label class="export-check-item">
+                        <input type="checkbox" name="incluirNotas">
+                        <div class="check-box-custom">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <span>Incluir notas de pedidos</span>
+                    </label>
+
+                    <label class="export-check-item">
+                        <input type="checkbox" name="incluirImpuestos" checked>
+                        <div class="check-box-custom">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <span>Incluir impuestos y propinas</span>
+                    </label>
+
+                    <label class="export-check-item">
+                        <input type="checkbox" name="incluirGraficas">
+                        <div class="check-box-custom">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <span>Incluir graficas comparativas</span>
+                    </label>
+                </div>
+
+                <!-- Rango seleccionado -->
+                <div class="export-range-section">
+                    <span class="range-label">Rango seleccionado</span>
+                    <span class="range-value">
+                        {% if fecha_inicio == fecha_fin %}
+                            Hoy, {{ fecha_inicio }}
+                        {% else %}
+                            {{ fecha_inicio }} - {{ fecha_fin }}
+                        {% endif %}
+                    </span>
+                </div>
+
+            </div>
+
+            <div class="modal-shadcn-footer">
+                <button type="button" class="btn-shadcn-outline" onclick="cerrarModal('modal-opciones-exportacion'); abrirModal('modal-preview-reporte')" id="btn-cancel-export">Cancelar</button>
+                <button type="submit" class="btn-shadcn-primary btn-generate" id="btn-submit-export">
+                    <span class="btn-text">Generar Archivo</span>
+                    <span class="btn-spinner" style="display: none;">
+                        <svg class="spinner-icon" viewBox="0 0 50 50">
+                            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                        </svg>
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container" class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Grafico Financiero (Ventas vs Gastos vs Ganancias)
+    const ventas = parseFloat('{{ resumen.get("ventas_totales", 0) }}');
+    const gastos = parseFloat('{{ resumen.get("gastos_totales", 0) }}');
+    const ganancias = parseFloat('{{ resumen.get("ganancias_netas", 0) }}');
+
+    const ctxFinanciero = document.getElementById('chart-financiero').getContext('2d');
+    new Chart(ctxFinanciero, {
+        type: 'bar',
+        data: {
+            labels: ['Ventas Totales', 'Gastos Totales', 'Ganancia Neta'],
+            datasets: [{
+                data: [ventas, gastos, ganancias],
+                backgroundColor: [
+                    'rgba(22, 163, 74, 0.15)',   // Verde
+                    'rgba(225, 29, 72, 0.15)',   // Rojo
+                    'rgba(212, 169, 106, 0.25)'  // Dorado
+                ],
+                borderColor: [
+                    '#16a34a',
+                    '#e11d48',
+                    '#d4a96a'
+                ],
+                borderWidth: 1.5,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f5f0eb' }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+
+    // 2. Grafico de Productos Mas Vendidos
+    const productNames = [];
+    const productSales = [];
+    {% for p in productos %}
+        productNames.push('{{ p.nombre }}');
+        productSales.push({{ p.total_vendido }});
+    {% endfor %}
+
+    const ctxProductos = document.getElementById('chart-productos').getContext('2d');
+    new Chart(ctxProductos, {
+        type: 'bar',
+        data: {
+            labels: productNames,
+            datasets: [{
+                data: productSales,
+                backgroundColor: 'rgba(44, 24, 16, 0.15)', // Color cafe claro
+                borderColor: '#2c1810',
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { color: '#f5f0eb' },
+                    ticks: {
+                        stepSize: 1
+                    }
+                },
+                y: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+});
+</script>
+
+{% endblock %}
