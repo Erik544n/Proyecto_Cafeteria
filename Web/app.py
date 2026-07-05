@@ -75,6 +75,7 @@ def dashboard():
 def usuarios():
     if not session.get("token"):
         return redirect(url_for("login"))
+    
     try:
         data  = requests.get(f"{API_BASE_URL}/admin/usuarios", headers=auth_headers()).json()
         roles = requests.get(f"{API_BASE_URL}/admin/roles",    headers=auth_headers()).json()
