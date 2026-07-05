@@ -16,7 +16,10 @@ interface Props {
   navigation: any;
 }
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function ColaScreen({ navigation }: Props) {
+  const { logout } = useAuth();
   const urgentes = PEDIDOS_MOCK.filter(p => p.urgente || p.estado === 'URGENTE').length;
   const enEspera = PEDIDOS_MOCK.filter(p => p.estado === 'PENDIENTE').length;
 
@@ -26,10 +29,10 @@ export default function ColaScreen({ navigation }: Props) {
 
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <TouchableOpacity onPress={logout} activeOpacity={0.8}>
           <Text style={styles.appName}>BrewMaster Ops</Text>
-          <Text style={styles.rolBadge}>COCINA</Text>
-        </View>
+          <Text style={styles.rolBadge}>🚪 SALIR</Text>
+        </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Panel de Cocina</Text>
           <Text style={styles.headerSub}>Gestión de pedidos en tiempo real</Text>

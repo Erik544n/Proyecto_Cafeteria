@@ -139,3 +139,173 @@ export const MENU_MOCK = [
   { id: 7, nombre: 'Croissant de Mantequilla', categoria: 'Panadería', precio: 65, disponible: true },
   { id: 8, nombre: 'Tostadas Francesas', categoria: 'Desayunos', precio: 115, disponible: true },
 ];
+
+
+// ─── MESAS MOCK ──────────────────────────────────────────────────────────────
+export interface MesaDetalle {
+  id: string;
+  numero: string;
+  estado: 'LIBRE' | 'OCUPADA' | 'RESERVADA';
+  capacidad: number;
+  area: 'PLANTA_BAJA' | 'TERRAZA' | 'SEGUNDO_PISO';
+  // Posiciones relativas para renderizar un mapa visual interactivo
+  x: number; // porcentaje horizontal (0-100)
+  y: number; // porcentaje vertical (0-100)
+}
+
+export const MESAS_MOCK: MesaDetalle[] = [
+  { id: '1', numero: '01', estado: 'LIBRE', capacidad: 4, area: 'PLANTA_BAJA', x: 15, y: 15 },
+  { id: '2', numero: '02', estado: 'LIBRE', capacidad: 4, area: 'PLANTA_BAJA', x: 45, y: 15 },
+  { id: '3', numero: '03', estado: 'LIBRE', capacidad: 2, area: 'PLANTA_BAJA', x: 75, y: 15 },
+  { id: '4', numero: '04', estado: 'OCUPADA', capacidad: 4, area: 'PLANTA_BAJA', x: 15, y: 45 },
+  { id: '5', numero: '05', estado: 'LIBRE', capacidad: 6, area: 'PLANTA_BAJA', x: 45, y: 45 },
+  { id: '6', numero: '06', estado: 'RESERVADA', capacidad: 4, area: 'PLANTA_BAJA', x: 75, y: 45 },
+  { id: '7', numero: '07', estado: 'LIBRE', capacidad: 4, area: 'PLANTA_BAJA', x: 15, y: 75 },
+  { id: '8', numero: '08', estado: 'OCUPADA', capacidad: 2, area: 'PLANTA_BAJA', x: 45, y: 75 },
+  { id: '9', numero: '09', estado: 'LIBRE', capacidad: 4, area: 'PLANTA_BAJA', x: 75, y: 75 },
+  { id: '10', numero: '10', estado: 'LIBRE', capacidad: 4, area: 'TERRAZA', x: 20, y: 25 },
+  { id: '11', numero: '11', estado: 'LIBRE', capacidad: 4, area: 'TERRAZA', x: 60, y: 25 },
+  { id: '12', numero: '12', estado: 'LIBRE', capacidad: 2, area: 'TERRAZA', x: 40, y: 65 },
+];
+
+
+// ─── CATALOGO MESERO MOCK ─────────────────────────────────────────────────────
+export interface ProductoCatalogo {
+  id: string;
+  nombre: string;
+  precio: number;
+  categoria: 'Cafeteria' | 'Panaderia' | 'Brunch';
+  imagenUrl: string; // URL de placeholder/fallback o emoji
+}
+
+export const CATALOGO_MOCK: ProductoCatalogo[] = [
+  // ── Cafetería ──
+  {
+    id: 'c1',
+    nombre: 'Flat White',
+    precio: 68,
+    categoria: 'Cafeteria',
+    imagenUrl: 'https://images.unsplash.com/photo-1577968897966-3d4325b36b61?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'c2',
+    nombre: 'Espresso',
+    precio: 45,
+    categoria: 'Cafeteria',
+    imagenUrl: 'https://images.unsplash.com/photo-1510707577719-ee7c2470acb4?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'c3',
+    nombre: 'Café Americano',
+    precio: 52,
+    categoria: 'Cafeteria',
+    imagenUrl: 'https://images.unsplash.com/photo-1497515114629-f71d768fd07c?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'c4',
+    nombre: 'V60 Colombia',
+    precio: 85,
+    categoria: 'Cafeteria',
+    imagenUrl: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'c5',
+    nombre: 'Cappuccino',
+    precio: 62,
+    categoria: 'Cafeteria',
+    imagenUrl: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'c6',
+    nombre: 'Matcha Latte',
+    precio: 75,
+    categoria: 'Cafeteria',
+    imagenUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=400&auto=format&fit=crop&q=80',
+  },
+  // ── Panadería ──
+  {
+    id: 'p1',
+    nombre: 'Croissant Mantequilla',
+    precio: 55,
+    categoria: 'Panaderia',
+    imagenUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'p2',
+    nombre: 'Muffin de Blueberry',
+    precio: 48,
+    categoria: 'Panaderia',
+    imagenUrl: 'https://images.unsplash.com/photo-1607958996333-41aef7caefaa?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'p3',
+    nombre: 'Pain au Chocolat',
+    precio: 62,
+    categoria: 'Panaderia',
+    imagenUrl: 'https://images.unsplash.com/photo-1623334044303-241021148842?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'p4',
+    nombre: 'Bagel con Queso Crema',
+    precio: 78,
+    categoria: 'Panaderia',
+    imagenUrl: 'https://images.unsplash.com/photo-1559302504-64aae6ca6b6d?w=400&auto=format&fit=crop&q=80',
+  },
+  // ── Brunch ──
+  {
+    id: 'b1',
+    nombre: 'Toast de Aguacate',
+    precio: 115,
+    categoria: 'Brunch',
+    imagenUrl: 'https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'b2',
+    nombre: 'Huevos Benedictinos',
+    precio: 175,
+    categoria: 'Brunch',
+    imagenUrl: 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'b3',
+    nombre: 'Bowl de Açaí',
+    precio: 135,
+    categoria: 'Brunch',
+    imagenUrl: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'b4',
+    nombre: 'Waffles con Frutas',
+    precio: 120,
+    categoria: 'Brunch',
+    imagenUrl: 'https://images.unsplash.com/photo-1562376552-0d160a2f238d?w=400&auto=format&fit=crop&q=80',
+  },
+];
+
+
+// ─── PEDIDOS EN CURSO MOCK ────────────────────────────────────────────────────
+export interface PedidoEnCurso {
+  id: string;
+  mesa: string;
+  resumen: string;
+  estado: 'LISTO' | 'EN_PREPARACION';
+  tiempo: string;
+}
+
+export const PEDIDOS_EN_CURSO_MOCK: PedidoEnCurso[] = [
+  {
+    id: 'pec1',
+    mesa: 'Mesa 04',
+    resumen: '2x Flat White, 1x Bagel',
+    estado: 'LISTO',
+    tiempo: 'Hace 2m',
+  },
+  {
+    id: 'pec2',
+    mesa: 'Mesa 08',
+    resumen: '1x V60 Colombia, 1x Cheesecake',
+    estado: 'EN_PREPARACION',
+    tiempo: 'Hace 8m',
+  },
+];
+

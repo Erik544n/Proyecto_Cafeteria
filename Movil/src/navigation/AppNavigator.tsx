@@ -5,21 +5,40 @@ import { Colors } from '../theme/colors';
 
 import CocinaNavigator from './CocinaNavigator';
 
+import { useAuth } from '../context/AuthContext';
+import LoginScreen from '../screens/auth/LoginScreen';
+
 const Tab = createBottomTabNavigator();
 
 // Pantallas placeholder para los otros módulos
 function PlaceholderScreen({ title }: { title: string }) {
+  const { logout } = useAuth();
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background, padding: 24 }}>
       <Text style={{ fontSize: 40, marginBottom: 12 }}>🚧</Text>
       <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.textPrimary }}>{title}</Text>
-      <Text style={{ fontSize: 13, color: Colors.textLight, marginTop: 6 }}>Próximamente</Text>
+      <Text style={{ fontSize: 13, color: Colors.textLight, marginTop: 6, textAlign: 'center', marginBottom: 24 }}>
+        Las interfaces de este módulo se diseñarán a continuación.
+      </Text>
+      <TouchableOpacity
+        style={{
+          backgroundColor: Colors.primary,
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          borderRadius: 8,
+        }}
+        onPress={logout}
+      >
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>CERRAR SESIÓN</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-function PedidosPlaceholder() { return <PlaceholderScreen title="Módulo Pedidos" />; }
-function MesasPlaceholder() { return <PlaceholderScreen title="Módulo Mesas" />; }
+import { TouchableOpacity } from 'react-native';
+import PedidosScreen from '../screens/mesero/PedidosScreen';
+import MesasScreen from '../screens/mesero/MesasScreen';
+
 function CajaPlaceholder() { return <PlaceholderScreen title="Módulo Caja" />; }
 
 interface TabIconProps {
@@ -38,8 +57,23 @@ function TabIcon({ emoji, label, focused }: TabIconProps) {
 }
 
 export default function AppNavigator() {
+  const { role } = useAuth();
+
+  if (role === null) {
+    return <LoginScreen />;
+  }
+
+  // Mapeo de pestaña inicial según el rol
+  const getInitialTab = () => {
+    if (role === 'COCINA') return 'CocinaTab';
+    if (role === 'CAJA') return 'CajaTab';
+    return 'PedidosTab'; // Mesero por defecto
+  };
+
   return (
     <Tab.Navigator
+      key={role} // Fuerza la recreación del navegador para aplicar el initialRouteName
+      initialRouteName={getInitialTab()}
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
@@ -48,7 +82,7 @@ export default function AppNavigator() {
     >
       <Tab.Screen
         name="PedidosTab"
-        component={PedidosPlaceholder}
+        component={PedidosScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon emoji="📋" label="Pedidos" focused={focused} />
@@ -57,7 +91,7 @@ export default function AppNavigator() {
       />
       <Tab.Screen
         name="MesasTab"
-        component={MesasPlaceholder}
+        component={MesasScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon emoji="🪑" label="Mesas" focused={focused} />
