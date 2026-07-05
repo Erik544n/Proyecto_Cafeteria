@@ -1,0 +1,25 @@
+{
+  "name": "caja",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "expo": "~54.0.0",
+    "expo-splash-screen": "~31.0.13",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-web": "^0.21.0"
+  },
+  "scripts": {
+    "start": "set EXPO_PACKAGER_HOSTNAME=192.168.0.105&& set REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.105&& npx.cmd expo start --host lan --port 8082 --clear",
+    "start:tunnel": "npx.cmd expo start --tunnel --port 8082 --clear",
+    "android": "set EXPO_PACKAGER_HOSTNAME=192.168.0.105&& set REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.105&& npx.cmd expo start --android --host lan --port 8082 --clear",
+    "ios": "set EXPO_PACKAGER_HOSTNAME=192.168.0.105&& set REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.105&& npx.cmd expo start --ios --host lan --port 8082 --clear",
+    "web": "npx.cmd expo start --web --port 8082"
+  },
+  "private": true,
+  "devDependencies": {
+    "@expo/ngrok": "^4.1.0"
+  }
+}
