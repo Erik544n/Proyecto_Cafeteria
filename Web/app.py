@@ -240,9 +240,10 @@ def estadisticas():
             headers=auth_headers()
         ).json()
 
-        # ── Todas las ventas de hoy (para la tabla de transacciones)
+        # ── Todas las ventas filtradas (para la tabla de transacciones)
         ventas_raw = requests.get(
-            f"{API_BASE_URL}/caja/ventas/hoy",
+            f"{API_BASE_URL}/admin/estadisticas/ventas",
+            params={"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin},
             headers=auth_headers()
         ).json()
         ventas_list = ventas_raw.get("ventas", [])

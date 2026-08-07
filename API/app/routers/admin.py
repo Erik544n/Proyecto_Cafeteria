@@ -251,6 +251,41 @@ def ventas_por_dia(
         for r in resultados
     ]
 
+@router.get("/estadisticas/ventas")
+def ventas_filtradas(
+    fecha_inicio: str = None,
+    fecha_fin: str = None,
+    db: Session = Depends(get_db),
+    admin: Usuario = Depends(require_rol("ADMIN"))
+):
+    """Lista de ventas filtradas por fecha."""
+    query = db.query(Venta).filter(Venta.anulada == False)
+    
+    if fecha_inicio:
+        query = query.filter(func.date(Venta.creado_en) >= fecha_inicio)
+    if fecha_fin:
+        query = query.filter(func.date(Venta.creado_en) <= fecha_fin)
+        
+    query = query.order_by(Venta.creado_en.desc())
+    ventas = query.all()
+
+    total_monto = sum(float(v.total) for v in ventas)
+
+    return {
+        "total_ventas": len(ventas),
+        "total_monto": total_monto,
+        "ventas": [
+            {
+                "venta_id": v.venta_id,
+                "pedido_id": v.pedido_id,
+                "metodo_pago": v.metodo_pago,
+                "total": float(v.total),
+                "creado_en": v.creado_en
+            }
+            for v in ventas
+        ]
+    }
+
 
 @router.get("/estadisticas/inventario")
 def inventario_completo(

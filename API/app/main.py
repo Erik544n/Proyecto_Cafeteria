@@ -5,7 +5,6 @@ from .routers import auth, mesero, cocina, caja, admin, reportes
 
 app = FastAPI(
     title="Cafeteria API",
-    description="API REST para la administración integral de la cafetería — UPQ S204",
     version="1.0.0"
 )
 

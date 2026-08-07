@@ -39,7 +39,7 @@ import { TouchableOpacity } from 'react-native';
 import PedidosScreen from '../screens/mesero/PedidosScreen';
 import MesasScreen from '../screens/mesero/MesasScreen';
 
-function CajaPlaceholder() { return <PlaceholderScreen title="Módulo Caja" />; }
+import CajaNavigator from './CajaNavigator';
 
 interface TabIconProps {
   emoji: string;
@@ -109,7 +109,7 @@ export default function AppNavigator() {
       />
       <Tab.Screen
         name="CajaTab"
-        component={CajaPlaceholder}
+        component={CajaNavigator}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon emoji="💰" label="Caja" focused={focused} />
