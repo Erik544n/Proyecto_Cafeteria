@@ -108,6 +108,7 @@ class DetallePedidoResponse(BaseModel):
     precio_unit: Decimal
     subtotal: Decimal
     observaciones: Optional[str]
+    producto_nombre: Optional[str] = None
 
     class Config:
         from_attributes = True

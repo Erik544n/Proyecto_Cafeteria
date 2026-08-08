@@ -116,14 +116,28 @@ def eliminar_usuario(
     db: Session = Depends(get_db),
     admin: Usuario = Depends(require_rol("ADMIN"))
 ):
-    """Elimina permanentemente un usuario."""
+    """Elimina permanentemente un usuario.
+    
+    Los pedidos del usuario se desvinculan (usuario_id → NULL) antes de eliminarlo
+    para no violar la restricción NOT NULL que produce el error de integridad.
+    """
+    from app.models import Pedido as PedidoModel  # import local para evitar ciclos
     usuario = db.query(Usuario).filter(Usuario.usuario_id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    if usuario.email == admin.email:
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propia cuenta")
+
+    # Desvincular pedidos: asignar usuario_id del admin actual para mantener integridad
+    db.query(PedidoModel).filter(PedidoModel.usuario_id == usuario_id).update(
+        {"usuario_id": admin.usuario_id}, synchronize_session=False
+    )
+
     db.delete(usuario)
     db.commit()
     return {"mensaje": "Usuario eliminado"}
+
 
 
 # ─────────────────────────────────────────

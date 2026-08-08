@@ -10,6 +10,7 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { MENU_MOCK } from '../../data/mockData';
 
@@ -52,7 +53,7 @@ export default function MenuScreen({ navigation }: Props) {
       <View style={styles.content}>
         {/* Búsqueda */}
         <View style={styles.searchWrap}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Ionicons name="search-outline" size={18} color={Colors.textLight} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar en el menú..."
@@ -87,7 +88,7 @@ export default function MenuScreen({ navigation }: Props) {
           {menuFiltrado.map(prod => (
             <View key={prod.id} style={[styles.prodCard, !prod.disponible && styles.prodCardInactivo]}>
               <View style={styles.prodIcon}>
-                <Text style={styles.prodEmoji}>🍽</Text>
+                <Ionicons name="restaurant-outline" size={20} color={Colors.primary} />
               </View>
               <View style={styles.prodInfo}>
                 <Text style={[styles.prodNombre, !prod.disponible && styles.prodNombreInactivo]}>

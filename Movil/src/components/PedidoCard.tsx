@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Pedido, EstadoPedido } from '../data/mockData';
 
@@ -94,7 +95,10 @@ export const PedidoCard: React.FC<PedidoCardProps> = ({
             <View style={styles.productoInfo}>
               <Text style={styles.productoNombre}>{prod.nombre}</Text>
               {prod.observaciones && (
-                <Text style={styles.observaciones}>💬 {prod.observaciones}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <Ionicons name="chatbubble-outline" size={12} color={Colors.accent} />
+                  <Text style={styles.observaciones}>{prod.observaciones}</Text>
+                </View>
               )}
             </View>
           </View>

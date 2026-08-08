@@ -24,11 +24,12 @@ def pedidos_por_cobrar(
     usuario: Usuario = Depends(get_current_user)
 ):
     """
-    Retorna pedidos en estado PENDIENTE para que caja los procese.
-    Son los pedidos recién creados por el mesero que aún no han sido cobrados.
+    Retorna pedidos que no han sido cobrados (no tienen venta activa).
+    Caja puede procesar pagos para pedidos en cualquier estado excepto CANCELADO.
     """
-    return db.query(Pedido).filter(
-        Pedido.estado == "PENDIENTE"
+    return db.query(Pedido).outerjoin(Venta, Pedido.pedido_id == Venta.pedido_id).filter(
+        Pedido.estado != "CANCELADO",
+        (Venta.venta_id == None) | (Venta.anulada == True)
     ).order_by(Pedido.creado_en.asc()).all()
 
 
@@ -67,14 +68,14 @@ def procesar_pago(
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
 
-    if pedido.estado not in ["PENDIENTE"]:
+    if pedido.estado == "CANCELADO":
         raise HTTPException(
             status_code=400,
-            detail=f"El pedido no puede cobrarse. Estado actual: {pedido.estado}"
+            detail="El pedido está cancelado y no puede cobrarse."
         )
 
-    # Verificar que no tenga ya una venta
-    venta_existente = db.query(Venta).filter(Venta.pedido_id == datos.pedido_id).first()
+    # Verificar que no tenga ya una venta activa
+    venta_existente = db.query(Venta).filter(Venta.pedido_id == datos.pedido_id, Venta.anulada == False).first()
     if venta_existente:
         raise HTTPException(status_code=400, detail="Este pedido ya fue cobrado")
 
@@ -117,19 +118,23 @@ def procesar_pago(
     )
     db.add(venta)
 
-    # Enviar a cocina
-    pedido.estado         = "EN_PREPARACION"
-    pedido.actualizado_en = datetime.utcnow()
+    # Si el pago es por adelantado (estado PENDIENTE), se manda a cocina
+    if pedido.estado == "PENDIENTE":
+        pedido.estado         = "EN_PREPARACION"
+        pedido.actualizado_en = datetime.utcnow()
 
-    # Notificar a cocina
-    notif_cocina = Notificacion(
-        pedido_id  = pedido.pedido_id,
-        usuario_id = usuario.usuario_id,
-        tipo       = "NUEVO_PEDIDO",
-        mensaje    = f"Nuevo pedido #{pedido.pedido_id} pagado — listo para preparar"
-                     + (f" — Mesa {pedido.mesa_id}" if pedido.mesa_id else " — Para llevar")
-    )
-    db.add(notif_cocina)
+        # Notificar a cocina
+        notif_cocina = Notificacion(
+            pedido_id  = pedido.pedido_id,
+            usuario_id = usuario.usuario_id,
+            tipo       = "NUEVO_PEDIDO",
+            mensaje    = f"Nuevo pedido #{pedido.pedido_id} pagado — listo para preparar"
+                         + (f" — Mesa {pedido.mesa_id}" if pedido.mesa_id else " — Para llevar")
+        )
+        db.add(notif_cocina)
+    else:
+        # Solo actualizamos el timestamp si el pago se hace después (ej: pedido ya Entregado o Listo)
+        pedido.actualizado_en = datetime.utcnow()
 
     db.commit()
     db.refresh(venta)

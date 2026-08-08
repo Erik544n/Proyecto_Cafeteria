@@ -1,387 +1,313 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
-  ScrollView,
+  SafeAreaView,
   StatusBar,
-  Dimensions,
+  ActivityIndicator,
   Alert,
+  RefreshControl,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
-import { MESAS_MOCK, MesaDetalle } from '../../data/mockData';
+import { apiGetMesas } from '../../services/api';
 
-interface Props {
-  navigation: any;
-}
-
-const AREAS = ['PLANTA_BAJA', 'TERRAZA'] as const;
-const AREA_NAMES = {
-  PLANTA_BAJA: 'Planta Baja',
-  TERRAZA: 'Terraza exterior',
+type InicioStackParamList = {
+  Mesas: undefined;
+  Catalogo: { mesaId: number; mesaNumero: number; capacidad: number };
 };
 
-export default function MesasScreen({ navigation }: Props) {
-  const { logout } = useAuth();
-  const [activeArea, setActiveArea] = useState<'PLANTA_BAJA' | 'TERRAZA'>('PLANTA_BAJA');
-  const [selectedMesa, setSelectedMesa] = useState<MesaDetalle | null>(null);
+type MesasNavigationProp = NativeStackNavigationProp<InicioStackParamList, 'Mesas'>;
 
-  const activeMesas = MESAS_MOCK.filter(m => m.area === activeArea);
+interface Mesa {
+  mesa_id: number;
+  numero: number;
+  capacidad: number;
+  estado: string; // 'LIBRE' | 'OCUPADA'
+  disponible?: boolean;
+}
 
-  const getStatusColor = (estado: MesaDetalle['estado']) => {
-    if (estado === 'OCUPADA') return Colors.urgente;
-    if (estado === 'RESERVADA') return Colors.pendiente;
-    return Colors.listo;
+// ─── Colores de estado ─────────────────────────────────────────
+const MESA_LIBRE_BG = '#e8f5e9';
+const MESA_LIBRE_BORDER = '#4CAF50';
+const MESA_LIBRE_TEXT = '#2e7d32';
+const MESA_OCUPADA_BG = '#ffebee';
+const MESA_OCUPADA_BORDER = '#f44336';
+const MESA_OCUPADA_TEXT = '#c62828';
+
+export default function MesasScreen() {
+  const navigation = useNavigation<MesasNavigationProp>();
+  const { token, user, logout } = useAuth();
+  const [mesas, setMesas] = useState<Mesa[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert('Cerrar sesión', '¿Estás seguro que deseas salir?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => logout() },
+    ]);
   };
 
-  const getStatusBgColor = (estado: MesaDetalle['estado']) => {
-    if (estado === 'OCUPADA') return Colors.urgenteLight;
-    if (estado === 'RESERVADA') return Colors.pendienteLight;
-    return Colors.listoLight;
+  const loadMesas = useCallback(async (silent = false) => {
+    if (!token) return;
+    silent ? setRefreshing(true) : setLoading(true);
+    try {
+      const data = await apiGetMesas(token);
+      setMesas(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      Alert.alert('Error', `No se pudieron cargar las mesas: ${err.message}`);
+    } finally {
+      silent ? setRefreshing(false) : setLoading(false);
+    }
+  }, [token]);
+
+  // Cargar al montar
+  useEffect(() => { loadMesas(); }, [loadMesas]);
+
+  // Recargar mesas cada vez que la pantalla recibe el foco (ej: al volver del catálogo)
+  useFocusEffect(
+    useCallback(() => {
+      loadMesas(true);
+    }, [loadMesas])
+  );
+
+  const isMesaLibre = (mesa: Mesa) => {
+    if (typeof mesa.disponible === 'boolean') return mesa.disponible;
+    return mesa.estado === 'LIBRE';
   };
+
+  const handlePressMesa = (mesa: Mesa) => {
+    const libre = isMesaLibre(mesa);
+    if (!libre) {
+      // Mesa ocupada: ofrecer agregar más productos
+      Alert.alert(
+        `Mesa ${mesa.numero} — Ocupada`,
+        `Esta mesa ya tiene una orden activa.\n¿Deseas agregar más productos?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Agregar productos',
+            onPress: () =>
+              navigation.navigate('Catalogo', {
+                mesaId: mesa.mesa_id,
+                mesaNumero: mesa.numero,
+                capacidad: mesa.capacidad,
+              }),
+          },
+        ]
+      );
+      return;
+    }
+    // Mesa libre: ir directo al catálogo
+    navigation.navigate('Catalogo', {
+      mesaId: mesa.mesa_id,
+      mesaNumero: mesa.numero,
+      capacidad: mesa.capacidad,
+    });
+  };
+
+  const libres = mesas.filter(isMesaLibre).length;
+  const ocupadas = mesas.length - libres;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Cargando mesas…</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={logout} activeOpacity={0.8} style={styles.logoutBtn}>
-          <Text style={styles.logoutEmoji}>🚪</Text>
-          <Text style={styles.logoutText}>Salir</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Mapa de Mesas</Text>
-        
-        <View style={{ width: 68 }} />
-      </View>
-
-      {/* Áreas selector */}
-      <View style={styles.areasRow}>
-        {AREAS.map(area => (
-          <TouchableOpacity
-            key={area}
-            style={[styles.areaTab, activeArea === area && styles.areaTabActive]}
-            onPress={() => {
-              setActiveArea(area);
-              setSelectedMesa(null);
-            }}
-          >
-            <Text style={[styles.areaTabText, activeArea === area && styles.areaTabTextActive]}>
-              {AREA_NAMES[area]}
-            </Text>
+        <View>
+          <Text style={styles.headerSubtitle}>Módulo Mesero</Text>
+          <Text style={styles.headerTitle}>Mapa de Mesas</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <Ionicons name="person-circle-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.userName}>{user?.nombre?.split(' ')[0]}</Text>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+            <Ionicons name="log-out-outline" size={20} color="#e53935" />
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Mapa contenedor */}
-      <View style={styles.mapContainer}>
-        <View style={styles.mapGrid}>
-          {/* Fondo cuadriculado decorativo */}
-          <View style={styles.gridOverlay} />
-          
-          {activeMesas.map(mesa => {
-            const isSelected = selectedMesa?.id === mesa.id;
-            const statusColor = getStatusColor(mesa.estado);
-            const statusBg = getStatusBgColor(mesa.estado);
-
-            return (
-              <TouchableOpacity
-                key={mesa.id}
-                style={[
-                  styles.mesaNode,
-                  {
-                    left: `${mesa.x}%`,
-                    top: `${mesa.y}%`,
-                    borderColor: isSelected ? Colors.primary : statusColor,
-                    backgroundColor: statusBg,
-                    borderWidth: isSelected ? 3 : 1.5,
-                  },
-                ]}
-                onPress={() => setSelectedMesa(mesa)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.mesaNodeNum}>{mesa.numero}</Text>
-                <Text style={styles.mesaNodeCap}>{mesa.capacidad}p</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Leyenda */}
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: Colors.listo }]} />
-            <Text style={styles.legendText}>Libre</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: Colors.urgente }]} />
-            <Text style={styles.legendText}>Ocupada</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: Colors.pendiente }]} />
-            <Text style={styles.legendText}>Reservada</Text>
-          </View>
         </View>
       </View>
 
-      {/* Detalle de Mesa Seleccionada */}
-      {selectedMesa && (
-        <View style={styles.detailCard}>
-          <View style={styles.detailHeader}>
-            <View>
-              <Text style={styles.detailTitle}>Mesa {selectedMesa.numero}</Text>
-              <Text style={styles.detailSubtitle}>Capacidad: {selectedMesa.capacidad} personas</Text>
-            </View>
-            <View style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusBgColor(selectedMesa.estado) }
-            ]}>
-              <Text style={[
-                styles.statusText,
-                { color: getStatusColor(selectedMesa.estado) }
-              ]}>
-                {selectedMesa.estado}
-              </Text>
-            </View>
-          </View>
+      {/* Leyenda de estado */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: MESA_LIBRE_BORDER }]} />
+          <Text style={styles.legendText}>{libres} libres</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: MESA_OCUPADA_BORDER }]} />
+          <Text style={styles.legendText}>{ocupadas} ocupadas</Text>
+        </View>
+        <Text style={styles.legendHint}>Toca una mesa para tomar una orden</Text>
+      </View>
 
-          {/* Acciones para la mesa */}
-          <View style={styles.detailActions}>
+      {/* Grid de mesas */}
+      <FlatList
+        data={mesas}
+        keyExtractor={(item) => String(item.mesa_id)}
+        numColumns={3}
+        contentContainerStyle={styles.grid}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadMesas(true)}
+            tintColor={Colors.primary}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="restaurant-outline" size={48} color={Colors.textLight} />
+            <Text style={styles.emptyText}>Sin mesas registradas</Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const libre = isMesaLibre(item);
+          return (
             <TouchableOpacity
-              style={styles.actionBtnPrimary}
-              onPress={() => {
-                navigation.navigate('Pedidos');
-              }}
+              style={[
+                styles.mesaCard,
+                {
+                  backgroundColor: libre ? MESA_LIBRE_BG : MESA_OCUPADA_BG,
+                  borderColor: libre ? MESA_LIBRE_BORDER : MESA_OCUPADA_BORDER,
+                },
+              ]}
+              onPress={() => handlePressMesa(item)}
+              activeOpacity={0.75}
             >
-              <Text style={styles.actionBtnPrimaryText}>
-                {selectedMesa.estado === 'OCUPADA' ? 'Ver / Editar Pedido' : 'Abrir Nuevo Pedido'}
+              <Ionicons
+                name="ellipse"
+                size={12}
+                color={libre ? MESA_LIBRE_BORDER : MESA_OCUPADA_BORDER}
+                style={{ marginBottom: 6 }}
+              />
+              <Text
+                style={[
+                  styles.mesaNumero,
+                  { color: libre ? MESA_LIBRE_TEXT : MESA_OCUPADA_TEXT },
+                ]}
+              >
+                Mesa {item.numero}
+              </Text>
+              <View style={styles.capacidadRow}>
+                <Ionicons name="people-outline" size={12} color={Colors.textLight} />
+                <Text style={styles.mesaCapacidad}>{item.capacidad}</Text>
+              </View>
+              <Text
+                style={[
+                  styles.mesaStatus,
+                  { color: libre ? MESA_LIBRE_TEXT : MESA_OCUPADA_TEXT },
+                ]}
+              >
+                {libre ? 'LIBRE' : 'OCUPADA'}
               </Text>
             </TouchableOpacity>
-
-            {selectedMesa.estado === 'OCUPADA' && (
-              <TouchableOpacity
-                style={styles.actionBtnSecondary}
-                onPress={() => Alert.alert('Caja', 'Generando pre-cuenta de la mesa...')}
-              >
-                <Text style={styles.actionBtnSecondaryText}>Pedir Cuenta</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      )}
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }
 
-const { width } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FAF6F0',
+    backgroundColor: Colors.background,
+    paddingTop: Platform.OS === 'android' ? 32 : 0,
   },
-  header: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0e8e0',
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F5ECE1',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  logoutEmoji: {
+  loadingText: {
+    marginTop: 12,
+    color: Colors.textSecondary,
     fontSize: 14,
   },
-  logoutText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: Colors.primary,
-  },
-  areasRow: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0e8e0',
-  },
-  areaTab: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  areaTabActive: {
-    borderBottomColor: Colors.primary,
-  },
-  areaTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textLight,
-  },
-  areaTabTextActive: {
-    color: Colors.primary,
-    fontWeight: '800',
-  },
-  mapContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  mapGrid: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e8ddd0',
-    position: 'relative',
-    overflow: 'hidden',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  gridOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.05,
-    borderWidth: 0.5,
-    borderColor: Colors.primary,
-    borderStyle: 'dashed',
-  },
-  mesaNode: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Centrar respecto a x, y de posicionamiento
-    transform: [{ translateX: -30 }, { translateY: -30 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  mesaNodeNum: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-  },
-  mesaNodeCap: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginTop: 1,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
-    marginTop: 14,
-    paddingBottom: 4,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  detailCard: {
-    position: 'absolute',
-    bottom: 84, // arriba de las tabs
-    left: 16,
-    right: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e8ddd0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  detailHeader: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  detailTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-  },
-  detailSubtitle: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  detailActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionBtnPrimary: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
     alignItems: 'center',
-  },
-  actionBtnPrimaryText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  actionBtnSecondary: {
-    backgroundColor: '#F5ECE1',
-    borderRadius: 12,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  headerSubtitle: {
+    color: Colors.accent,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  headerTitle: {
+    color: Colors.textPrimary,
+    fontSize: 26,
+    fontWeight: '800',
+  },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  userName: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  logoutBtn: { padding: 4, marginLeft: 4 },
+  legend: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.surface,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  actionBtnSecondaryText: {
-    color: Colors.primary,
-    fontWeight: '700',
-    fontSize: 13,
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  legendHint: {
+    flex: 1,
+    textAlign: 'right',
+    color: Colors.textLight,
+    fontSize: 11,
+    fontStyle: 'italic',
   },
+  grid: {
+    padding: 12,
+    paddingBottom: 100,
+  },
+  mesaCard: {
+    flex: 1,
+    margin: 6,
+    borderRadius: 16,
+    borderWidth: 2,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  mesaNumero: { fontSize: 14, fontWeight: '800', marginBottom: 4, textAlign: 'center' },
+  capacidadRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+  mesaCapacidad: { fontSize: 12, color: Colors.textLight, textAlign: 'center' },
+  mesaStatus: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  emptyContainer: { alignItems: 'center', marginTop: 60 },
+  emptyText: { color: Colors.textLight, fontSize: 16, fontWeight: '600', marginTop: 12 },
 });

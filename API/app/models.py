@@ -182,6 +182,11 @@ class DetallePedido(Base):
     pedido   = relationship("Pedido", back_populates="detalles")
     producto = relationship("ProductoMenu", back_populates="detalles")
 
+    @property
+    def producto_nombre(self) -> str:
+        return self.producto.nombre if self.producto else f"Producto #{self.producto_id}"
+
+
 
 class Venta(Base):
     __tablename__ = "ventas"

@@ -127,13 +127,12 @@ def listar_pedidos_mesero(
     usuario: Usuario = Depends(get_current_user)
 ):
     """
-    Retorna los pedidos activos del mesero autenticado.
-    Excluye ENTREGADO y CANCELADO.
+    Retorna todos los pedidos del mesero autenticado (incluye Pendiente, En Prep, Listo, Entregado y Cancelado).
     """
     return db.query(Pedido).filter(
-        Pedido.usuario_id == usuario.usuario_id,
-        Pedido.estado.notin_(["ENTREGADO", "CANCELADO"])
+        Pedido.usuario_id == usuario.usuario_id
     ).order_by(Pedido.creado_en.desc()).all()
+
 
 
 @router.get("/pedidos/{pedido_id}", response_model=PedidoResponse)

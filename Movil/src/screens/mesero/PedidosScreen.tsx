@@ -1,609 +1,336 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Image,
   FlatList,
+  TouchableOpacity,
+  SafeAreaView,
   StatusBar,
+  ActivityIndicator,
   Alert,
+  Platform,
+  RefreshControl,
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
-import {
-  MESAS_MOCK,
-  CATALOGO_MOCK,
-  PEDIDOS_EN_CURSO_MOCK,
-  ProductoCatalogo,
-} from '../../data/mockData';
+import { apiGetPedidos } from '../../services/api';
 
-interface Props {
-  navigation: any;
+type EstadoFiltro = 'TODOS' | 'PENDIENTE' | 'EN_PREPARACION' | 'LISTO' | 'ENTREGADO' | 'CANCELADO';
+
+const FILTROS: { key: EstadoFiltro; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'TODOS', label: 'Todos', icon: 'list-outline' },
+  { key: 'PENDIENTE', label: 'Pendiente', icon: 'time-outline' },
+  { key: 'EN_PREPARACION', label: 'En Prep.', icon: 'flame-outline' },
+  { key: 'LISTO', label: 'Listo', icon: 'checkmark-circle-outline' },
+  { key: 'ENTREGADO', label: 'Entregado', icon: 'checkmark-done-outline' },
+  { key: 'CANCELADO', label: 'Cancelado', icon: 'close-circle-outline' },
+];
+
+const ESTADO_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  PENDIENTE:       { bg: '#fff8e1', text: '#e65100', border: '#ffb300' },
+  EN_PREPARACION:  { bg: '#fff3e0', text: '#bf360c', border: '#ff6f00' },
+  LISTO:           { bg: '#e8f5e9', text: '#2e7d32', border: '#4caf50' },
+  ENTREGADO:       { bg: '#e3f2fd', text: '#0d47a1', border: '#1976d2' },
+  CANCELADO:       { bg: '#fce4ec', text: '#b71c1c', border: '#e53935' },
+};
+
+interface Detalle {
+  detalle_id: number;
+  producto_id: number;
+  cantidad: number;
+  precio_unit: number;
+  subtotal: number;
+  observaciones?: string;
+  producto_nombre?: string;
 }
 
-export default function PedidosScreen({ navigation }: Props) {
-  const { logout } = useAuth();
-  const [activeMesa, setActiveMesa] = useState('04');
-  const [categoria, setCategoria] = useState<'Cafeteria' | 'Panaderia' | 'Brunch'>('Cafeteria');
-  const [busqueda, setBusqueda] = useState('');
-  
-  // Estado del carrito (simulado para el nuevo pedido)
-  const [cart, setCart] = useState<Record<string, number>>({
-    'c1': 2, // 2x Flat White
-  });
+interface Pedido {
+  pedido_id: number;
+  mesa_id?: number;
+  usuario_id: number;
+  estado: string;
+  observaciones?: string;
+  total: number;
+  creado_en: string;
+  detalles: Detalle[];
+}
 
-  const getCartCount = () => Object.values(cart).reduce((sum, count) => sum + count, 0);
-  const getCartTotal = () => {
-    return Object.entries(cart).reduce((sum, [id, count]) => {
-      const prod = CATALOGO_MOCK.find(p => p.id === id);
-      return sum + (prod ? prod.precio * count : 0);
-    }, 0);
+function formatHora(isoString: string) {
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '--:--';
+  }
+}
+
+function formatFecha(isoString: string) {
+  try {
+    const d = new Date(isoString);
+    const hoy = new Date();
+    if (
+      d.getDate() === hoy.getDate() &&
+      d.getMonth() === hoy.getMonth() &&
+      d.getFullYear() === hoy.getFullYear()
+    ) {
+      return `Hoy ${formatHora(isoString)}`;
+    }
+    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) + ' ' + formatHora(isoString);
+  } catch {
+    return isoString;
+  }
+}
+
+export default function PedidosScreen() {
+  const navigation = useNavigation<any>();
+  const { token, logout } = useAuth();
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filtro, setFiltro] = useState<EstadoFiltro>('TODOS');
+
+  const handleLogout = () => {
+    Alert.alert('Cerrar sesión', '¿Estás seguro que deseas salir?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => logout() },
+    ]);
   };
 
-  const addToCart = (id: string) => {
-    setCart(prev => ({
-      ...prev,
-      [id]: (prev[id] || 0) + 1,
-    }));
-  };
+  const loadPedidos = useCallback(async (silent = false) => {
+    if (!token) return;
+    silent ? setRefreshing(true) : setLoading(true);
+    try {
+      const data = await apiGetPedidos(token);
+      setPedidos(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      Alert.alert('Error', `No se pudieron cargar los pedidos: ${err.message}`);
+    } finally {
+      silent ? setRefreshing(false) : setLoading(false);
+    }
+  }, [token]);
 
-  const filteredProducts = CATALOGO_MOCK.filter(p => {
-    const matchCat = p.categoria === categoria;
-    const matchSearch = p.nombre.toLowerCase().includes(busqueda.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  useEffect(() => { loadPedidos(); }, [loadPedidos]);
+
+  // Auto-reload when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadPedidos(true);
+    }, [loadPedidos])
+  );
+
+  const pedidosFiltrados = filtro === 'TODOS'
+    ? pedidos
+    : pedidos.filter((p) => p.estado === filtro);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Cargando pedidos…</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={logout} activeOpacity={0.8} style={styles.logoutBtn}>
-          <Text style={styles.logoutEmoji}>🚪</Text>
-          <Text style={styles.logoutText}>Salir</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.appName}>BrewMaster Ops</Text>
-        
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIconBtn}>
-            <Text style={styles.bellIcon}>🔔</Text>
-          </TouchableOpacity>
-          <View style={styles.activeMesaBadge}>
-            <Text style={styles.activeMesaText}>M{activeMesa}</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+
+      {/* Header Fijo */}
+      <View style={styles.topFixedContainer}>
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Mis Pedidos</Text>
+            <Text style={styles.headerSub}>{pedidos.length} pedidos · Desliza para actualizar</Text>
           </View>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+            <Ionicons name="log-out-outline" size={22} color="#e53935" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Filtros Horizontales Fijos */}
+        <View style={styles.filtrosWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtrosList}
+          >
+            {FILTROS.map((f) => {
+              const isActive = filtro === f.key;
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[styles.filtroBtn, isActive && styles.filtroBtnActive]}
+                  onPress={() => setFiltro(f.key)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={f.icon}
+                    size={15}
+                    color={isActive ? '#fff' : Colors.textSecondary}
+                  />
+                  <Text style={[styles.filtroText, isActive && styles.filtroTextActive]}>
+                    {f.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Sección Mesas */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Mesas</Text>
-          <Text style={styles.sectionSub}>PLANTA BAJA</Text>
-        </View>
+      {/* Lista de pedidos compacta */}
+      <FlatList
+        data={pedidosFiltrados}
+        keyExtractor={(item) => String(item.pedido_id)}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadPedidos(true)}
+            tintColor={Colors.primary}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={48} color={Colors.textLight} />
+            <Text style={styles.emptyTitle}>Sin pedidos</Text>
+            <Text style={styles.emptyText}>
+              {filtro === 'TODOS'
+                ? 'No tienes pedidos registrados. Ve a Mesas para tomar uno.'
+                : `No hay pedidos en estado "${filtro}".`}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const estado = ESTADO_COLORS[item.estado] ?? { bg: '#f5f5f5', text: '#666', border: '#ccc' };
+          const totalItems = item.detalles.reduce((acc, d) => acc + d.cantidad, 0);
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mesasScroll} contentContainerStyle={styles.mesasContent}>
-          {MESAS_MOCK.filter(m => m.area === 'PLANTA_BAJA').slice(0, 4).map(m => {
-            const esActiva = m.numero === activeMesa;
-            const esOcupada = m.estado === 'OCUPADA';
-            
-            return (
-              <TouchableOpacity
-                key={m.id}
-                style={[
-                  styles.mesaCard,
-                  esOcupada && styles.mesaCardOcupada,
-                  esActiva && styles.mesaCardActiva,
-                ]}
-                onPress={() => setActiveMesa(m.numero)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.mesaNumero, (esActiva || esOcupada) && styles.textWhite]}>{m.numero}</Text>
-                <Text style={[styles.mesaEstado, esActiva ? styles.textActiveLabel : esOcupada ? styles.textOcupadaLabel : styles.textLibreLabel]}>
-                  {m.estado === 'OCUPADA' ? 'Ocupada' : 'Libre'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Sección Pedidos en Curso */}
-        <Text style={styles.seccionLabel}>PEDIDOS EN CURSO</Text>
-        <View style={styles.pedidosCursoContainer}>
-          {PEDIDOS_EN_CURSO_MOCK.map(pedido => (
-            <View key={pedido.id} style={[styles.pedidoCursoCard, pedido.estado === 'LISTO' ? styles.pedidoListoBorder : styles.pedidoPrepBorder]}>
-              <View style={styles.pedidoCursoLeft}>
-                <Text style={styles.pedidoCursoMesa}>{pedido.mesa} •</Text>
-                <Text style={styles.pedidoCursoResumen} numberOfLines={1}>{pedido.resumen}</Text>
-              </View>
-              <View style={styles.pedidoCursoRight}>
-                <View style={[styles.statusBadge, pedido.estado === 'LISTO' ? styles.statusBadgeListo : styles.statusBadgePrep]}>
-                  <Text style={[styles.statusBadgeText, pedido.estado === 'LISTO' ? styles.statusTextListo : styles.statusTextPrep]}>
-                    {pedido.estado}
-                  </Text>
-                </View>
-                <Text style={styles.pedidoCursoTiempo}>{pedido.tiempo}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Sección Catálogo */}
-        <View style={styles.catalogoHeaderRow}>
-          <Text style={styles.sectionTitle}>Catálogo</Text>
-          <TouchableOpacity style={styles.searchBarToggle} onPress={() => {}}>
-            <Text style={styles.searchBarIcon}>🔍 Buscar</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Categorías */}
-        <View style={styles.categoriesRow}>
-          {(['Cafeteria', 'Panaderia', 'Brunch'] as const).map(cat => (
+          return (
             <TouchableOpacity
-              key={cat}
-              style={[styles.categoryChip, categoria === cat && styles.categoryChipActive]}
-              onPress={() => setCategoria(cat)}
+              style={[styles.pedidoCard, { borderLeftColor: estado.border }]}
+              onPress={() => navigation.navigate('DetallePedidoMesero', { pedido: item })}
               activeOpacity={0.8}
             >
-              <Text style={[styles.categoryText, categoria === cat && styles.categoryTextActive]}>
-                {cat}
-              </Text>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.pedidoIdRow}>
+                  <Text style={styles.pedidoId}>Pedido #{item.pedido_id}</Text>
+                  {item.mesa_id && (
+                    <View style={styles.mesaBadge}>
+                      <Text style={styles.mesaBadgeText}>Mesa {item.mesa_id}</Text>
+                    </View>
+                  )}
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+              </View>
+
+              <Text style={styles.pedidoFecha}>{formatFecha(item.creado_en)}</Text>
+
+              <View style={styles.cardMiddleRow}>
+                <View style={[styles.estadoBadge, { backgroundColor: estado.bg, borderColor: estado.border }]}>
+                  <Text style={[styles.estadoText, { color: estado.text }]}>
+                    {item.estado.replace('_', ' ')}
+                  </Text>
+                </View>
+
+                <View style={styles.itemsCountBadge}>
+                  <Ionicons name="cube-outline" size={13} color={Colors.textSecondary} />
+                  <Text style={styles.itemsCountText}>{totalItems} producto(s)</Text>
+                </View>
+              </View>
+
+              <View style={styles.cardFooterRow}>
+                <Text style={styles.verDetalleHint}>Ver productos y detalles</Text>
+                <Text style={styles.pedidoTotal}>${Number(item.total).toFixed(2)}</Text>
+              </View>
             </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Búsqueda */}
-        <View style={styles.searchBarContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder={`Buscar en ${categoria}...`}
-            value={busqueda}
-            onChangeText={setBusqueda}
-          />
-        </View>
-
-        {/* Grid de Productos */}
-        <View style={styles.productsGrid}>
-          {filteredProducts.map(prod => (
-            <View key={prod.id} style={styles.productCard}>
-              <View style={styles.imageContainer}>
-                <Image source={{ uri: prod.imagenUrl }} style={styles.productImage} />
-                <TouchableOpacity
-                  style={styles.addButtonCircle}
-                  onPress={() => addToCart(prod.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.addBtnIcon}>＋</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.productNombre}>{prod.nombre}</Text>
-              <Text style={styles.productPrecio}>${prod.precio.toFixed(0)} MXN</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={{ height: 160 }} />
-      </ScrollView>
-
-      {/* Barra Flotante de Nuevo Pedido */}
-      {getCartCount() > 0 && (
-        <View style={styles.floatingCartContainer}>
-          <View style={styles.floatingCartCard}>
-            <View style={styles.cartBadgeContainer}>
-              <View style={styles.cartCountCircle}>
-                <Text style={styles.cartCountText}>{getCartCount()}</Text>
-              </View>
-              <View>
-                <Text style={styles.cartMesaTitle}>Mesa {activeMesa} —</Text>
-                <Text style={styles.cartTotalText}>${getCartTotal().toFixed(0)} MXN</Text>
-              </View>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.enviarComandaBtn}
-              onPress={() => {
-                Alert.alert('Pedido enviado', '¡Tu nuevo pedido fue enviado a cocina!');
-                setCart({});
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.enviarComandaText}>Enviar Nuevo Pedido</Text>
-              <Text style={styles.comandaForkIcon}>🍽</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#FAF6F0', // Fondo crema claro premium
+  safe: { flex: 1, backgroundColor: Colors.background, paddingTop: Platform.OS === 'android' ? 32 : 0 },
+  loadingText: { marginTop: 12, color: Colors.textSecondary, fontSize: 14 },
+  topFixedContainer: {
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8ddd0',
+    zIndex: 10,
+    elevation: 4,
   },
   header: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0e8e0',
   },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F5ECE1',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  logoutEmoji: {
-    fontSize: 14,
-  },
-  logoutText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  appName: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: Colors.primary,
-    fontFamily: 'serif',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerIconBtn: {
-    padding: 6,
-  },
-  bellIcon: {
-    fontSize: 20,
-  },
-  activeMesaBadge: {
-    backgroundColor: Colors.accentLight,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  activeMesaText: {
-    fontWeight: '800',
-    color: Colors.primary,
-    fontSize: 12,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Colors.primary,
-    fontFamily: 'serif',
-  },
-  sectionSub: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textLight,
-    letterSpacing: 1,
-  },
-  mesasScroll: {
-    marginBottom: 20,
-  },
-  mesasContent: {
-    gap: 10,
-  },
-  mesaCard: {
-    width: 76,
-    height: 76,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#e8ddd0',
-    alignItems: 'center',
+  headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary },
+  headerSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  logoutBtn: { padding: 6, marginLeft: 8 },
+  filtrosWrapper: {
+    height: 52,
     justifyContent: 'center',
-    gap: 4,
   },
-  mesaCardOcupada: {
-    backgroundColor: '#F7CBB0', // naranja claro de ocupado
-    borderColor: '#E8A583',
-  },
-  mesaCardActiva: {
-    backgroundColor: Colors.accent, // activo (selección)
-    borderColor: Colors.primary,
-  },
-  mesaNumero: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-  },
-  mesaEstado: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  textWhite: {
-    color: Colors.primary,
-  },
-  textActiveLabel: {
-    color: Colors.primary,
-  },
-  textOcupadaLabel: {
-    color: '#8A4A28',
-  },
-  textLibreLabel: {
-    color: Colors.textLight,
-  },
-  seccionLabel: {
-    color: Colors.textLight,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  pedidosCursoContainer: {
-    gap: 10,
-    marginBottom: 24,
-  },
-  pedidoCursoCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  filtrosList: {
+    paddingHorizontal: 16,
     alignItems: 'center',
-    borderLeftWidth: 5,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  pedidoListoBorder: {
-    borderLeftColor: Colors.listo,
-  },
-  pedidoPrepBorder: {
-    borderLeftColor: Colors.accent,
-  },
-  pedidoCursoLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  pedidoCursoMesa: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  pedidoCursoResumen: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  pedidoCursoRight: {
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  statusBadgeListo: {
-    backgroundColor: Colors.listoLight,
-  },
-  statusBadgePrep: {
-    backgroundColor: Colors.accentLight + '40',
-  },
-  statusBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  statusTextListo: {
-    color: Colors.listo,
-  },
-  statusTextPrep: {
-    color: Colors.primary,
-  },
-  pedidoCursoTiempo: {
-    fontSize: 11,
-    color: Colors.textLight,
-  },
-  catalogoHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  searchBarToggle: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  searchBarIcon: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  categoriesRow: {
-    flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
   },
-  categoryChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 9,
+  filtroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e8ddd0',
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: '#e0d5cc',
+    height: 36,
   },
-  categoryChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  categoryText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '700',
-  },
-  categoryTextActive: {
-    color: '#ffffff',
-  },
-  searchBarContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: '#e8ddd0',
-    marginBottom: 16,
-  },
-  searchInput: {
-    paddingVertical: 10,
-    fontSize: 13,
-    color: Colors.textPrimary,
-  },
-  productsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  productCard: {
-    width: '48%',
-    backgroundColor: '#ffffff',
+  filtroBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  filtroText: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary },
+  filtroTextActive: { color: '#fff' },
+  listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 100, gap: 12 },
+  emptyContainer: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary, marginTop: 12, marginBottom: 8 },
+  emptyText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  pedidoCard: {
+    backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: '#f0e8e0',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  imageContainer: {
-    position: 'relative',
-    width: '100%',
-    height: 110,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  addButtonCircle: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    backgroundColor: 'rgba(44, 24, 16, 0.9)',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnIcon: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  productNombre: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 2,
-    paddingHorizontal: 4,
-  },
-  productPrecio: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: Colors.textSecondary,
-    paddingHorizontal: 4,
-  },
-  floatingCartContainer: {
-    position: 'absolute',
-    bottom: 84, // Arriba de la barra de pestañas
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-  },
-  floatingCartCard: {
-    backgroundColor: '#2c1810',
-    borderRadius: 16,
-    padding: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    padding: 16,
+    borderLeftWidth: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  cartBadgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pedidoIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pedidoId: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
+  mesaBadge: { backgroundColor: Colors.accent + '22', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  mesaBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.accent },
+  pedidoFecha: { fontSize: 12, color: Colors.textSecondary, marginTop: 2, marginBottom: 10 },
+  cardMiddleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  estadoBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  cartCountCircle: {
-    width: 24,
-    height: 24,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartCountText: {
-    color: '#2c1810',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  cartMesaTitle: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  cartTotalText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  enviarComandaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  enviarComandaText: {
-    color: '#2c1810',
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  comandaForkIcon: {
-    fontSize: 14,
-  },
+  estadoText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  itemsCountBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f5f0eb', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  itemsCountText: { fontSize: 12, fontWeight: '700', color: Colors.textSecondary },
+  cardFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f0ebe5', paddingTop: 10 },
+  verDetalleHint: { fontSize: 12, color: Colors.primary, fontWeight: '700' },
+  pedidoTotal: { fontSize: 18, fontWeight: '900', color: Colors.primary },
 });

@@ -9,37 +9,39 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
-import { useAuth, UserRole } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
+import { API_CONFIG } from '../../services/config';
 
 export default function LoginScreen() {
-  const { login } = useAuth();
+  const { login, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = () => {
-    if (!email || !password) {
-      setError('Por favor, ingresa correo y contraseña.');
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Campos requeridos', 'Por favor ingresa tu correo y contraseña.');
       return;
     }
-    setError('');
-    // Simular inicio de sesión según el correo o por defecto
-    const lowerEmail = email.toLowerCase();
-    if (lowerEmail.includes('cocina')) {
-      login('COCINA');
-    } else if (lowerEmail.includes('caja')) {
-      login('CAJA');
-    } else {
-      login('MESERO'); // Por defecto mesero
+    try {
+      await login(email.trim(), password);
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      if (msg.includes('401') || msg.toLowerCase().includes('credenciales')) {
+        Alert.alert('Acceso denegado', 'Correo o contraseña incorrectos.');
+      } else {
+        Alert.alert(
+          'Error de conexión',
+          'No se pudo establecer comunicación con el servidor. Por favor verifica tu conexión a internet.'
+        );
+      }
     }
-  };
-
-  const selectQuickRole = (role: UserRole) => {
-    setError('');
-    login(role);
   };
 
   return (
@@ -57,7 +59,7 @@ export default function LoginScreen() {
           {/* Logo y Encabezado */}
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
-              <Text style={styles.logoIcon}>☕</Text>
+              <Ionicons name="cafe" size={44} color={Colors.accent} />
             </View>
             <Text style={styles.appName}>BrewMaster Ops</Text>
             <Text style={styles.appSub}>Gestión de Cafetería Premium</Text>
@@ -67,8 +69,6 @@ export default function LoginScreen() {
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Iniciar Sesión</Text>
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
             <View style={styles.inputWrap}>
               <Text style={styles.inputLabel}>Correo Electrónico</Text>
               <TextInput
@@ -77,61 +77,53 @@ export default function LoginScreen() {
                 placeholderTextColor={Colors.textLight}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
                 value={email}
                 onChangeText={setEmail}
+                editable={!loading}
               />
             </View>
 
             <View style={styles.inputWrap}>
               <Text style={styles.inputLabel}>Contraseña</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="********"
-                placeholderTextColor={Colors.textLight}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[styles.input, { flex: 1, paddingRight: 44 }]}
+                  placeholder="••••••••"
+                  placeholderTextColor={Colors.textLight}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!loading}
+                  onSubmitEditing={handleLogin}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color={Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <TouchableOpacity style={styles.loginBtn} onPress={handleLogin} activeOpacity={0.85}>
-              <Text style={styles.loginBtnText}>INGRESAR</Text>
+            <TouchableOpacity
+              style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
+              onPress={handleLogin}
+              activeOpacity={0.85}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.loginBtnText}>INGRESAR</Text>
+              )}
             </TouchableOpacity>
-          </View>
-
-          {/* Selector de Roles para Demo */}
-          <View style={styles.demoContainer}>
-            <Text style={styles.demoTitle}>Simular Rol (Prototipo)</Text>
-            <Text style={styles.demoSub}>Toca un rol para ingresar directamente sin escribir credenciales:</Text>
-
-            <View style={styles.rolesRow}>
-              <TouchableOpacity
-                style={[styles.roleChip, { backgroundColor: Colors.accent }]}
-                onPress={() => selectQuickRole('MESERO')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.roleChipEmoji}>📱</Text>
-                <Text style={styles.roleChipText}>Mesero</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.roleChip, { backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.accent }]}
-                onPress={() => selectQuickRole('COCINA')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.roleChipEmoji}>🍳</Text>
-                <Text style={[styles.roleChipText, { color: '#ffffff' }]}>Cocina</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.roleChip, { backgroundColor: Colors.listo }]}
-                onPress={() => selectQuickRole('CAJA')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.roleChipEmoji}>💰</Text>
-                <Text style={styles.roleChipText}>Caja</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -151,13 +143,13 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 40,
   },
   logoCircle: {
-    width: 80,
-    height: 80,
-    backgroundColor: Colors.accent + '20',
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    backgroundColor: Colors.accent + '22',
+    borderRadius: 45,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -165,7 +157,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent,
   },
   logoIcon: {
-    fontSize: 40,
+    fontSize: 44,
   },
   appName: {
     color: '#ffffff',
@@ -177,107 +169,78 @@ const styles = StyleSheet.create({
     color: Colors.accentLight,
     fontSize: 14,
     marginTop: 4,
+    opacity: 0.85,
   },
   formCard: {
     backgroundColor: Colors.surface,
     borderRadius: 20,
-    padding: 24,
+    padding: 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
   },
   formTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
-  },
-  errorText: {
-    color: Colors.urgente,
-    fontSize: 12,
-    marginBottom: 14,
-    textAlign: 'center',
-    fontWeight: '600',
   },
   inputWrap: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   inputLabel: {
     fontSize: 12,
     color: Colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: 6,
+    fontWeight: '700',
+    marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   input: {
     backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
+    borderColor: Colors.border ?? '#e0d5cc',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 15,
     color: Colors.textPrimary,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 14,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   loginBtn: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  loginBtnDisabled: {
+    opacity: 0.6,
   },
   loginBtnText: {
     color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 14,
-    letterSpacing: 1,
-  },
-  demoContainer: {
-    marginTop: 36,
-    alignItems: 'center',
-  },
-  demoTitle: {
-    color: Colors.accentLight,
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  demoSub: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    textAlign: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  rolesRow: {
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'center',
-    width: '100%',
-  },
-  roleChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  roleChipEmoji: {
-    fontSize: 16,
-  },
-  roleChipText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.primary,
+    fontWeight: '800',
+    fontSize: 15,
+    letterSpacing: 1.2,
   },
 });

@@ -1,312 +1,439 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar,
-  TextInput,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
+  SafeAreaView, TextInput, ActivityIndicator, Alert, Platform, StatusBar, ScrollView
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
+import { apiCocinaGetInventario, apiCocinaGetBajoStock } from '../../services/api';
 import { Colors } from '../../theme/colors';
-import { INVENTARIO_MOCK } from '../../data/mockData';
 
-interface Props {
-  navigation: any;
-}
+export default function InventarioScreen() {
+  const navigation = useNavigation<any>();
+  const { token } = useAuth();
+  
+  const [inventario, setInventario] = useState<any[]>([]);
+  const [bajoStockIds, setBajoStockIds] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filtro, setFiltro] = useState<'Todos' | 'En Stock' | 'Bajo Stock' | 'Sin Stock'>('Todos');
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-export default function InventarioScreen({ navigation }: Props) {
-  const [busqueda, setBusqueda] = React.useState('');
+  const fetchData = useCallback(async (silent = false) => {
+    if (!token) return;
+    silent ? setRefreshing(true) : setLoading(true);
+    try {
+      const [invRes, bajoStockRes] = await Promise.all([
+        apiCocinaGetInventario(token),
+        apiCocinaGetBajoStock(token)
+      ]);
+      
+      setInventario(invRes);
+      
+      const bajoIds = new Set<number>();
+      bajoStockRes.forEach((item: any) => bajoIds.add(item.insumo_id));
+      setBajoStockIds(bajoIds);
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+      Alert.alert('Error', 'No se pudo cargar el inventario.');
+    } finally {
+      silent ? setRefreshing(false) : setLoading(false);
+    }
+  }, [token]);
 
-  const inventarioFiltrado = INVENTARIO_MOCK.filter(i =>
-    i.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  // Refrescar al entrar a la pantalla
+  useFocusEffect(
+    useCallback(() => {
+      fetchData(true);
+    }, [fetchData])
   );
 
-  const sinStock = INVENTARIO_MOCK.filter(i => i.estado === 'sin_stock').length;
-  const stockBajo = INVENTARIO_MOCK.filter(i => i.estado === 'stock_bajo').length;
+  const filteredData = inventario.filter(item => {
+    const matchesSearch = item.nombre.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    
+    const isOutOfStock = item.stock_actual <= 0;
+    const isLowStock = bajoStockIds.has(item.insumo_id) && !isOutOfStock;
+    
+    if (filtro === 'Sin Stock') return isOutOfStock;
+    if (filtro === 'Bajo Stock') return isLowStock;
+    if (filtro === 'En Stock') return !isOutOfStock && !isLowStock;
+    
+    return true; // 'Todos'
+  });
+
+  const totalItems = inventario.length;
+  const outOfStockCount = inventario.filter(i => i.stock_actual <= 0).length;
+  const lowStockCount = bajoStockIds.size;
+
+  const renderItem = ({ item }: { item: any }) => {
+    const isOutOfStock = item.stock_actual <= 0;
+    const isLowStock = bajoStockIds.has(item.insumo_id) && !isOutOfStock;
+    
+    // Calculate progress bar percentage
+    const min = item.stock_minimo > 0 ? item.stock_minimo : 1;
+    const maxStock = min * 2.5; 
+    const percentage = Math.min(100, Math.max(0, (item.stock_actual / maxStock) * 100));
+    
+    let progressColor = '#10b981'; // Green
+    let statusText = 'En Stock';
+    let statusColor = '#10b981';
+    let statusBg = '#d1fae5';
+
+    if (isOutOfStock) {
+      progressColor = '#ef4444'; // Red
+      statusText = 'Sin Stock';
+      statusColor = '#ef4444';
+      statusBg = '#fee2e2';
+    } else if (isLowStock) {
+      progressColor = '#f59e0b'; // Yellow
+      statusText = 'Bajo Stock';
+      statusColor = '#f59e0b';
+      statusBg = '#fef3c7';
+    }
+    
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.itemName}>{item.nombre}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+            <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.stockInfo}>
+          <View>
+            <Text style={styles.stockLabel}>Stock Actual</Text>
+            <Text style={[styles.stockValue, { color: isOutOfStock ? '#ef4444' : Colors.textPrimary }]}>
+              {item.stock_actual} {item.unidad_id || 'u'}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={styles.stockLabel}>Stock Mínimo</Text>
+            <Text style={styles.stockValueSec}>{item.stock_minimo} {item.unidad_id || 'u'}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: progressColor }]} />
+        </View>
+        
+        <View style={styles.cardFooter}>
+          <Text style={styles.costLabel}>Costo Unitario</Text>
+          <Text style={styles.costValue}>${Number(item.costo_unitario).toFixed(2)}</Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.headerTexts}>
-          <Text style={styles.headerTitle}>Inventario</Text>
-          <Text style={styles.headerSub}>Control de suministros</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => navigation.navigate('AgregarInsumo')}
-        >
-          <Text style={styles.addIcon}>＋</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Inventario</Text>
       </View>
 
-      {/* Resumen de alertas */}
-      <View style={styles.alertasRow}>
-        <View style={styles.alertaItem}>
-          <Text style={styles.alertaNum}>{sinStock}</Text>
-          <Text style={styles.alertaLabel}>Sin stock</Text>
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{totalItems}</Text>
+          <Text style={styles.statLabel}>Total Insumos</Text>
         </View>
-        <View style={styles.alertaSep} />
-        <View style={styles.alertaItem}>
-          <Text style={[styles.alertaNum, { color: Colors.pendiente }]}>{stockBajo}</Text>
-          <Text style={styles.alertaLabel}>Stock bajo</Text>
+        <View style={styles.statBox}>
+          <Text style={[styles.statValue, { color: '#f59e0b' }]}>{lowStockCount}</Text>
+          <Text style={styles.statLabel}>Bajo Stock</Text>
         </View>
-        <View style={styles.alertaSep} />
-        <View style={styles.alertaItem}>
-          <Text style={[styles.alertaNum, { color: Colors.listo }]}>{INVENTARIO_MOCK.length - sinStock - stockBajo}</Text>
-          <Text style={styles.alertaLabel}>En orden</Text>
+        <View style={[styles.statBox, { borderRightWidth: 0 }]}>
+          <Text style={[styles.statValue, { color: '#ef4444' }]}>{outOfStockCount}</Text>
+          <Text style={styles.statLabel}>Sin Stock</Text>
         </View>
       </View>
 
-      <View style={styles.content}>
-        {/* Búsqueda */}
-        <View style={styles.searchWrap}>
-          <Text style={styles.searchIcon}>🔍</Text>
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchWrapper}>
+          <Ionicons name="search-outline" size={20} color={Colors.textLight} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar insumo..."
+            placeholder="Buscar ingrediente o insumo..."
             placeholderTextColor={Colors.textLight}
-            value={busqueda}
-            onChangeText={setBusqueda}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearIcon}>
+              <Ionicons name="close-circle" size={20} color={Colors.textLight} />
+            </TouchableOpacity>
+          )}
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.lista}>
-          {inventarioFiltrado.map(insumo => {
-            const esSinStock = insumo.estado === 'sin_stock';
-            const esStockBajo = insumo.estado === 'stock_bajo';
-            const porcentaje = Math.min((insumo.stock / insumo.minimo) * 100, 100);
-
-            return (
-              <View
-                key={insumo.id}
-                style={[
-                  styles.insumoCard,
-                  esSinStock && styles.insumoCardDanger,
-                  esStockBajo && styles.insumoCardWarning,
-                ]}
+        <View style={styles.filtersContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
+            {['Todos', 'En Stock', 'Bajo Stock', 'Sin Stock'].map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterChip, filtro === f && styles.filterChipActive]}
+                onPress={() => setFiltro(f as any)}
               >
-                <View style={styles.insumoTop}>
-                  <View style={styles.insumoNombreWrap}>
-                    <View style={[
-                      styles.estadoDot,
-                      esSinStock && { backgroundColor: Colors.urgente },
-                      esStockBajo && { backgroundColor: Colors.pendiente },
-                      !esSinStock && !esStockBajo && { backgroundColor: Colors.listo },
-                    ]} />
-                    <Text style={styles.insumoNombre}>{insumo.nombre}</Text>
-                  </View>
-                  <View style={styles.stockWrap}>
-                    <Text style={[
-                      styles.stockNum,
-                      esSinStock && { color: Colors.urgente },
-                      esStockBajo && { color: Colors.pendiente },
-                    ]}>
-                      {insumo.stock}
-                    </Text>
-                    <Text style={styles.stockUnidad}> {insumo.unidad}</Text>
-                  </View>
-                </View>
-
-                {/* Barra de progreso */}
-                <View style={styles.progressBg}>
-                  <View style={[
-                    styles.progressFill,
-                    { width: `${porcentaje}%` as any },
-                    esSinStock && { backgroundColor: Colors.urgente },
-                    esStockBajo && { backgroundColor: Colors.pendiente },
-                    !esSinStock && !esStockBajo && { backgroundColor: Colors.listo },
-                  ]} />
-                </View>
-
-                <Text style={styles.minimoTexto}>Mínimo: {insumo.minimo} {insumo.unidad}</Text>
-              </View>
-            );
-          })}
-          <View style={{ height: 80 }} />
-        </ScrollView>
+                <Text style={[styles.filterChipText, filtro === f && styles.filterChipTextActive]}>{f}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       </View>
+
+      {/* List */}
+      {loading && inventario.length === 0 ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={{ marginTop: 12, color: Colors.textSecondary, fontSize: 14 }}>Cargando inventario...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredData}
+          keyExtractor={(item) => item.insumo_id.toString()}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={() => fetchData(true)} 
+              colors={[Colors.primary]} 
+              tintColor={Colors.primary} 
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="cube-outline" size={56} color={Colors.textLight} />
+              <Text style={styles.emptyTitle}>Inventario vacío</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery ? 'No se encontraron resultados para tu búsqueda.' : 'No hay insumos registrados en el sistema.'}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  safeArea: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.background,
+    paddingTop: Platform.OS === 'android' ? 32 : 0,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
-    backgroundColor: Colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    justifyContent: 'space-between',
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    color: '#ffffff',
-    fontSize: 22,
-  },
-  headerTexts: {
-    alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8ddd0',
   },
   headerTitle: {
-    color: '#ffffff',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  headerSub: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    marginTop: 1,
-  },
-  addBtn: {
-    width: 36,
-    height: 36,
-    backgroundColor: Colors.accent,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addIcon: {
-    color: Colors.primary,
-    fontSize: 20,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  alertasRow: {
-    backgroundColor: Colors.primaryLight,
-    flexDirection: 'row',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  alertaItem: {
-    alignItems: 'center',
-  },
-  alertaNum: {
-    color: Colors.urgente,
     fontSize: 22,
     fontWeight: '800',
+    color: Colors.textPrimary,
   },
-  alertaLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    marginTop: 2,
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0ebe5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  alertaSep: {
-    width: 1,
-    height: 30,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  content: {
+  statBox: {
     flex: 1,
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#f0ebe5',
   },
-  searchWrap: {
+  statValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: Colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  searchContainer: {
+    padding: 16,
+    backgroundColor: Colors.background,
+    paddingBottom: 4,
+  },
+  searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 8,
+    borderColor: '#e8ddd0',
+    paddingHorizontal: 12,
   },
   searchIcon: {
-    fontSize: 16,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 11,
-    fontSize: 14,
+    paddingVertical: 14,
+    fontSize: 15,
     color: Colors.textPrimary,
   },
-  lista: {
-    gap: 10,
+  clearIcon: {
+    padding: 4,
   },
-  insumoCard: {
+  filtersContainer: {
+    marginTop: 12,
+  },
+  filtersScroll: {
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#e8ddd0',
   },
-  insumoCardDanger: {
-    borderColor: Colors.urgenteBorder,
-    backgroundColor: Colors.urgenteLight,
+  filterChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
-  insumoCardWarning: {
-    borderColor: Colors.pendienteBorder,
-    backgroundColor: Colors.pendienteLight,
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
-  insumoTop: {
+  filterChipTextActive: {
+    color: '#fff',
+  },
+  listContainer: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f0ebe5',
+  },
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 14,
   },
-  insumoNombreWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  estadoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  insumoNombre: {
-    fontSize: 14,
-    fontWeight: '500',
+  itemName: {
+    fontSize: 17,
+    fontWeight: '800',
     color: Colors.textPrimary,
     flex: 1,
+    marginRight: 10,
   },
-  stockWrap: {
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  stockInfo: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 10,
   },
-  stockNum: {
-    fontSize: 18,
+  stockLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  stockUnidad: {
-    fontSize: 12,
     color: Colors.textSecondary,
+    marginBottom: 4,
   },
-  progressBg: {
+  stockValue: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  stockValueSec: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textLight,
+  },
+  progressContainer: {
     height: 6,
-    backgroundColor: Colors.borderLight,
+    backgroundColor: '#f5f0eb',
     borderRadius: 3,
-    marginBottom: 6,
     overflow: 'hidden',
+    marginBottom: 14,
   },
-  progressFill: {
+  progressBar: {
     height: '100%',
     borderRadius: 3,
   },
-  minimoTexto: {
-    fontSize: 11,
-    color: Colors.textLight,
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f5f0eb',
+    paddingTop: 12,
+  },
+  costLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  costValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  emptyContainer: {
+    paddingTop: 60,
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
