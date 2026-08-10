@@ -9,6 +9,7 @@ import MesasScreen from '../screens/mesero/MesasScreen';
 import PedidosScreen from '../screens/mesero/PedidosScreen';
 import CatalogoScreen from '../screens/mesero/CatalogoScreen';
 import DetallePedidoMeseroScreen from '../screens/mesero/DetallePedidoMeseroScreen';
+import NotificacionesMeseroScreen from '../screens/mesero/NotificacionesMeseroScreen';
 
 // ─── Stack para el flujo Inicio: Mesas → Catálogo (directo)
 const InicioStack = createNativeStackNavigator();
@@ -68,6 +69,8 @@ export default function MeseroNavigator() {
             iconName = focused ? 'restaurant' : 'restaurant-outline';
           } else if (route.name === 'PedidosTab') {
             iconName = focused ? 'receipt' : 'receipt-outline';
+          } else if (route.name === 'NotificacionesTab') {
+            iconName = focused ? 'notifications' : 'notifications-outline';
           }
           return <Ionicons name={iconName} size={22} color={color} />;
         },
@@ -82,6 +85,11 @@ export default function MeseroNavigator() {
         name="PedidosTab"
         component={PedidosStackNavigator}
         options={{ tabBarLabel: 'Pedidos' }}
+      />
+      <Tab.Screen
+        name="NotificacionesTab"
+        component={NotificacionesMeseroScreen}
+        options={{ tabBarLabel: 'Alertas' }}
       />
     </Tab.Navigator>
   );

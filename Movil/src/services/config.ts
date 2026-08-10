@@ -6,5 +6,5 @@
 
 export const API_CONFIG = {
   // Túnel activo o IP de tu computadora en la red local
-  BASE_URL: 'https://blue-falcons-study.loca.lt',
+  BASE_URL: 'https://early-books-serve.loca.lt',
 };

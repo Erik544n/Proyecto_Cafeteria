@@ -199,9 +199,21 @@ def ver_notificaciones(
         Notificacion.leida == False
     ).order_by(Notificacion.creado_en.desc()).all()
 
+    resultado = [
+        {
+            "notificacion_id": n.notificacion_id,
+            "pedido_id": n.pedido_id,
+            "tipo": n.tipo,
+            "mensaje": n.mensaje,
+            "leida": n.leida,
+            "creado_en": n.creado_en.isoformat() if n.creado_en else None,
+        }
+        for n in notifs
+    ]
+
     # Marcar como leídas
     for n in notifs:
         n.leida = True
     db.commit()
 
-    return notifs
+    return resultado

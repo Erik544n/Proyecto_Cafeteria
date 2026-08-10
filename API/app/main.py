@@ -23,6 +23,7 @@ app.include_router(caja.router)
 app.include_router(admin.router)
 app.include_router(reportes.router)
 
+
 @app.get("/", tags=["Health"])
 def root():
     return {"mensaje": "Cafeteria API funcionando", "version": "1.0.0", "docs": "/docs"}

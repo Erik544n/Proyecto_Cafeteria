@@ -63,9 +63,16 @@ def dashboard():
             f"{API_BASE_URL}/admin/estadisticas/resumen",
             headers=auth_headers()
         ).json()
+        productos = requests.get(
+            f"{API_BASE_URL}/admin/estadisticas/productos-mas-vendidos",
+            params={"dias": 30, "limite": 1},
+            headers=auth_headers()
+        ).json()
+        producto_estrella = productos[0]["nombre"] if (isinstance(productos, list) and len(productos) > 0) else "Sin ventas aún"
     except Exception:
         resumen = {}
-    return render_template("dashboard.html", resumen=resumen)
+        producto_estrella = "Sin ventas aún"
+    return render_template("dashboard.html", resumen=resumen, producto_estrella=producto_estrella)
 
 
 # ─────────────────────────────────────────
@@ -296,7 +303,7 @@ def estadisticas():
                 # Buscar nombre del producto
                 try:
                     prod_resp = requests.get(
-                        f"{API_BASE_URL}/cocina/menu/{prod_id}",
+                        f"{API_BASE_URL}/cocina/productos/{prod_id}",
                         headers=auth_headers()
                     ).json()
                     nombre_prod = prod_resp.get("nombre", f"Producto #{prod_id}")

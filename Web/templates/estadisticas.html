@@ -75,7 +75,27 @@
         </div>
     </div>
 
-    <!-- Tarjeta 3: Ventas por canal -->
+    <!-- Tarjeta 3: Gastos Totales -->
+    <div class="stats-card">
+        <div class="stats-card-icon-wrap">
+            <div class="stats-card-icon naranja-bg">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+                </svg>
+            </div>
+        </div>
+        <p class="stats-card-label">Gastos Totales</p>
+        <h2 class="stats-card-value">${{ "%.2f"|format(resumen.get("gastos_totales", 0)) }}</h2>
+        <div class="stats-card-trend negativo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                <polyline points="17 18 23 18 23 12"/>
+            </svg>
+            Gastos operativos
+        </div>
+    </div>
+
+    <!-- Tarjeta 4: Ventas por canal -->
     <div class="stats-card">
         <div class="stats-card-icon-wrap">
             <div class="stats-card-icon cafe-bg">

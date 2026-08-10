@@ -9,6 +9,7 @@ import DetallePedidoScreen from '../screens/caja/DetallePedidoScreen';
 import ProcesarPagoScreen from '../screens/caja/ProcesarPagoScreen';
 import TicketScreen from '../screens/caja/TicketScreen';
 import HistorialVentasScreen from '../screens/caja/HistorialVentasScreen';
+import GastosScreen from '../screens/caja/GastosScreen';
 
 export type CajaStackParamList = {
   CuentasActivas: undefined;
@@ -57,6 +58,8 @@ export default function CajaNavigator() {
             iconName = focused ? 'card' : 'card-outline';
           } else if (route.name === 'HistorialTab') {
             iconName = focused ? 'receipt' : 'receipt-outline';
+          } else if (route.name === 'GastosTab') {
+            iconName = focused ? 'wallet' : 'wallet-outline';
           }
           return <Ionicons name={iconName} size={22} color={color} />;
         },
@@ -81,6 +84,11 @@ export default function CajaNavigator() {
         name="HistorialTab"
         component={HistorialStackNavigator}
         options={{ tabBarLabel: 'Ventas' }}
+      />
+      <Tab.Screen
+        name="GastosTab"
+        component={GastosScreen}
+        options={{ tabBarLabel: 'Gastos' }}
       />
     </Tab.Navigator>
   );

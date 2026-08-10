@@ -219,6 +219,7 @@ def _notificar_mesero(pedido: Pedido, db: Session):
     db.add(notif)
 
 
+
 # ─────────────────────────────────────────
 # GESTIÓN DE MENÚ (PRODUCTOS)
 # ─────────────────────────────────────────

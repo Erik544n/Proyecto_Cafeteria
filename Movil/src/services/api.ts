@@ -107,6 +107,14 @@ export async function apiEntregarPedido(token: string, pedidoId: number) {
   return handleResponse(res);
 }
 
+// ─── Mesero: Notificaciones ────────────────────────────────────
+export async function apiMeseroGetNotificaciones(token: string) {
+  const res = await fetch(`${BASE}/mesero/notificaciones`, {
+    headers: authHeaders(token),
+  });
+  return handleResponse(res);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // COCINA
 // ═══════════════════════════════════════════════════════════════
